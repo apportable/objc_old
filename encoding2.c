@@ -123,6 +123,12 @@ inline static void round_up(size_t *v, size_t b)
 		*v += b - (*v % b);
 	}
 }
+
+// On Windows, we pick up a #define of max here.
+#ifdef max
+#  undef max
+#endif
+
 inline static size_t max(size_t v, size_t v2)
 {
 	return v>v2 ? v : v2;

@@ -9,7 +9,8 @@
 
 void objc_send_initialize(id object);
 
-__thread id objc_msg_sender;
+// Removed __thread because __thread isn't supported on Windows.
+id objc_msg_sender;
 
 static id nil_method(id self, SEL _cmd) { return nil; }
 
