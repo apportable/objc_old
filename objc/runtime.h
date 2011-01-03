@@ -67,7 +67,7 @@ typedef signed char BOOL;
 #		ifdef __vxwords
 typedef  int BOOL
 #		else
-#			ifdef WIN32
+#			ifdef _WINDOWS
 typedef  int BOOL;
 #			else
 typedef unsigned char BOOL;
