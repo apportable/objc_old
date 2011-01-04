@@ -6,9 +6,7 @@ CCFLAGS = \
     -D_XOPEN_SOURCE=500 \
     -D__OBJC_RUNTIME_INTERNAL__=1 \
 
-ifeq ($(OSTYPE), Linux)
-CCFLAGS +=
-else
+ifeq ($(OS), win)
 CCFLAGS += \
     -I$(SYSDIR)/pthreads \
     -I$(SYSDIR)/dcfnix
