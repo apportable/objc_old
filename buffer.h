@@ -5,7 +5,8 @@
 
 #include <stdlib.h>
 
-#define BUFFER_SIZE 128
+// This was originally 128; increasing it seems to fix a category loader crash on Mac.
+#define BUFFER_SIZE 256
 static BUFFER_TYPE *buffered_object_buffer[BUFFER_SIZE];
 static BUFFER_TYPE **buffered_object_overflow;
 static int buffered_objects;
