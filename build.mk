@@ -9,7 +9,8 @@ CCFLAGS = \
 ifeq ($(OS), win)
 CCFLAGS += \
     -I$(SYSDIR)/pthreads \
-    -I$(SYSDIR)/dcfnix
+    -I$(SYSDIR)/dcfnix \
+
 endif
 
 OBJECTS = \
