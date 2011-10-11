@@ -12,7 +12,13 @@ void objc_send_initialize(id object);
 // Removed __thread because __thread isn't supported on Windows.
 id objc_msg_sender;
 
-static id nil_method(id self, SEL _cmd) { return nil; }
+static id nil_method(id self, SEL _cmd) {
+  const char *name = sel_getName(_cmd);
+  if (self && strcmp(name, "release")) {
+    VERDE_DEBUG("Missing implementation of %s", name);
+  }
+  return nil;
+}
 
 static struct objc_slot nil_slot = { Nil, Nil, "", 1, (IMP)nil_method };
 
