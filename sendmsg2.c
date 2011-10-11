@@ -13,10 +13,12 @@ void objc_send_initialize(id object);
 id objc_msg_sender;
 
 static id nil_method(id self, SEL _cmd) {
+#ifndef NDEBUG
   const char *name = sel_getName(_cmd);
   if (self && strcmp(name, "release")) {
     VERDE_DEBUG("Missing implementation of %s", name);
   }
+#endif
   return nil;
 }
 
