@@ -16,7 +16,7 @@ static id nil_method(id self, SEL _cmd) {
 #ifndef NDEBUG
   const char *name = sel_getName(_cmd);
   if (self && strcmp(name, "release")) {
-    VERDE_DEBUG("Missing implementation of %s", name);
+      VERDE_DEBUG("Missing implementation of %s %s", self == NULL ? "<INVALID>" : class_getName(object_getClass(self)), name);
   }
 #endif
   return nil;
