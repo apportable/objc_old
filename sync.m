@@ -112,7 +112,9 @@ static void deallocLockClass(id obj, SEL _cmd)
 // NSLocking protocol, just sending them a -lock message.
 void objc_sync_enter(id obj)
 {
+#ifndef ANDROID
 	return; // JACKSON!
+#endif
 	Class lockClass = findLockClass(obj);
 	if (Nil == lockClass)
 	{
@@ -131,7 +133,9 @@ void objc_sync_enter(id obj)
 
 void objc_sync_exit(id obj)
 {
+#ifndef ANDROID
 	return; // JACKSON!
+#endif
 	Class lockClass = findLockClass(obj);
 	mutex_t *lock = object_getIndexedIvars(lockClass);
 	UNLOCK(lock);
