@@ -19,6 +19,40 @@
 #	include <dispatch/dispatch.h>
 #else
 
+//#ifdef __cplusplus
+//#define DISPATCH_DECL(name) typedef struct name##_s : public dispatch_object_s {} *name##_t
+//#else
+/*! @parseOnly */
+//#define DISPATCH_DECL(name) typedef struct name##_s *name##_t
+//#endif
+
+#ifdef __BLOCKS__
+typedef void (^dispatch_block_t)(void);
+#endif
+
+typedef uint64_t dispatch_time_t;
+
+#ifdef NSEC_PER_SEC
+#undef NSEC_PER_SEC
+#endif
+#ifdef USEC_PER_SEC
+#undef USEC_PER_SEC
+#endif
+#ifdef NSEC_PER_USEC
+#undef NSEC_PER_USEC
+#endif
+#ifdef NSEC_PER_MSEC
+#undef NSEC_PER_MSEC
+#endif
+#define NSEC_PER_SEC 1000000000ull
+#define NSEC_PER_MSEC 1000000ull
+#define USEC_PER_SEC 1000000ull
+#define NSEC_PER_USEC 1000ull
+
+
+#define DISPATCH_TIME_NOW 0
+#define DISPATCH_TIME_FOREVER (~0ull)
+
 /**
  * Function type for functions that can be added to dispatch queues.
  */
