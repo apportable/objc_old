@@ -19,12 +19,7 @@
 #	include <dispatch/dispatch.h>
 #else
 
-//#ifdef __cplusplus
-//#define DISPATCH_DECL(name) typedef struct name##_s : public dispatch_object_s {} *name##_t
-//#else
-/*! @parseOnly */
-//#define DISPATCH_DECL(name) typedef struct name##_s *name##_t
-//#endif
+#include <stdint.h>
 
 #ifdef __BLOCKS__
 typedef void (^dispatch_block_t)(void);
