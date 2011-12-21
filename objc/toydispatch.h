@@ -62,10 +62,19 @@ typedef struct dispatch_queue * dispatch_queue_t;
 dispatch_queue_t dispatch_queue_create(const char *label,
 		void *attr);
 
+dispatch_queue_t dispatch_get_main_queue(void);
+
 #define dispatch_async_f toy_dispatch_async_f
+
 /**
  * Add a function to the queue.  
  */
+
+#ifdef __BLOCKS__
+void dispatch_async(dispatch_queue_t queue, void (^block)(void));
+void dispatch_after(dispatch_time_t when, dispatch_queue_t queue, void (^block)(void));
+#endif
+
 void dispatch_async_f(dispatch_queue_t queue, void *context,
 		dispatch_function_t work);
 
@@ -75,3 +84,6 @@ void dispatch_release(dispatch_queue_t queue);
 #define dispatch_retain toy_dispatch_retain
 void dispatch_retain(dispatch_queue_t queue);
 #endif
+
+dispatch_time_t dispatch_time(dispatch_time_t base, int64_t offset);
+

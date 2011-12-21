@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #define __TOY_DISPATCH__
 #include "objc/toydispatch.h"
+#ifdef __BLOCKS__
+#include "objc/blocks_runtime.h"
+#endif
 
 /**
  * Amount of total space in the ring buffer.  Must be a power of two.
@@ -57,6 +60,12 @@ struct dispatch_queue
 	} ring_buffer[RING_BUFFER_SIZE];
 };
 
+struct deferred_dispatch_info {
+  dispatch_queue_t queue;
+  void(^block)(void);
+  dispatch_time_t when;
+};
+
 /**
  * Check how much space is in the queue.  The number of used elements in the
  * queue is always equal to producer - consumer.   Producer will always
@@ -84,6 +93,22 @@ struct dispatch_queue
  * more complex mapping operation were chosen, but this one is nice and cheap.
  */
 #define MASK(index) ((index) & RING_BUFFER_MASK)
+
+static dispatch_time_t current_time();
+
+static dispatch_queue_t main_queue = NULL;
+
+static void create_main_queue() {
+  if (main_queue == NULL) {
+    dispatch_queue_t queue = calloc(1, sizeof(struct dispatch_queue));
+  	queue->refcount = 1;
+  	pthread_cond_init(&queue->conditionVariable, NULL);
+  	pthread_mutex_init(&queue->mutex, NULL);
+  	// The main queue does not get its own runloop and thread.
+  	// The main queue must be processed on the main thread and
+  	// will be handled via VerdeKitContinue( )
+  }
+}
 
 /**
  * Lock the queue.  This uses a very lightweight, nonrecursive, spinlock.  It
@@ -202,6 +227,24 @@ static void *runloop(void *q)
 	return NULL;
 }
 
+static void *deferred_queue_insert(void *param)
+{
+  struct deferred_dispatch_info *info = (struct deferred_dispatch_info *)param;
+  uint64_t now = current_time();
+  while (now < info->when) {
+    uint64_t diff = info->when - now;
+
+    struct timespec tdiff;
+    tdiff.tv_sec = diff/NSEC_PER_SEC;
+    tdiff.tv_nsec = diff - (tdiff.tv_sec * NSEC_PER_SEC);
+
+    nanosleep(&tdiff, NULL);
+    now = current_time();
+  }
+  dispatch_async(info->queue, info->block);
+  free(info);
+  return NULL;
+}
 
 dispatch_queue_t dispatch_queue_create(const char *label,
 		void *attr)
@@ -216,6 +259,34 @@ dispatch_queue_t dispatch_queue_create(const char *label,
 	return queue;
 }
 
+dispatch_queue_t dispatch_get_main_queue(void) {
+  if (main_queue == NULL) {
+    create_main_queue();
+  }
+  
+  return main_queue;
+}
+
+#ifdef __BLOCKS__
+void dispatch_async(dispatch_queue_t queue, void (^block)(void)) {
+  struct block_literal *theblock = (struct block_literal *)block;
+  dispatch_async_f(queue, theblock, theblock->invoke);
+}
+
+void dispatch_after(dispatch_time_t when, dispatch_queue_t queue, void (^block)(void)) {
+  struct deferred_dispatch_info *info = calloc(1, sizeof(struct deferred_dispatch_info));
+  info->queue = queue;
+  info->block = block;
+  info->when = when;
+
+  pthread_t thread;
+  pthread_create(&thread, NULL, deferred_queue_insert, info);
+  pthread_detach(thread);
+
+}
+
+#endif
+
 void dispatch_async_f(dispatch_queue_t queue, void *context,
 		dispatch_function_t work)
 {
@@ -224,6 +295,8 @@ void dispatch_async_f(dispatch_queue_t queue, void *context,
 
 static void release(void *queue)
 {
+  // Do not allow the main queue to be released.
+  if (queue == main_queue) return;
 	((dispatch_queue_t)queue)->refcount--;
 }
 
@@ -237,4 +310,37 @@ void dispatch_release(dispatch_queue_t queue)
 void dispatch_retain(dispatch_queue_t queue)
 {
 	queue->refcount++;
+}
+
+dispatch_time_t dispatch_time(dispatch_time_t base, int64_t offset) {
+  if (base == DISPATCH_TIME_FOREVER) {
+    return DISPATCH_TIME_FOREVER;
+  }
+  if (base == DISPATCH_TIME_NOW) {
+    base = current_time();
+  }
+  return base+offset;
+}
+
+
+dispatch_time_t current_time() {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (dispatch_time_t)now.tv_sec*NSEC_PER_SEC + now.tv_nsec;
+}
+
+void process_main_queue() {
+	dispatch_function_t function;
+	void *data;
+
+  if (main_queue == NULL || ISEMPTY(main_queue)) {
+    return;
+  }
+  while (!ISEMPTY(main_queue)) {
+  	unsigned int idx = MASK(main_queue->consumer);
+  	function = main_queue->ring_buffer[idx].function;
+  	data = main_queue->ring_buffer[idx].data;
+  	__sync_fetch_and_add(&main_queue->consumer, 1);
+  	function(data);
+  }
 }

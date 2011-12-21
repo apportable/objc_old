@@ -5,6 +5,7 @@ CCFLAGS = \
     -DGNUSTEP \
     -D_XOPEN_SOURCE=500 \
     -D__OBJC_RUNTIME_INTERNAL__=1 \
+    -fblocks \
 
 # Occasionally, it seems to deadlock by trying to
 # lock the selector table twice. This was observed in
