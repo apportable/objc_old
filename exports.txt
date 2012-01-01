@@ -172,3 +172,7 @@ sel_register_typed_name
 selector_create
 toy_dispatch_async_f
 toy_dispatch_queue_create
+objc_setAssociatedObject
+objc_getAssociatedObject
+objc_removeAssociatedObjects
+

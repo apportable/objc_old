@@ -406,8 +406,27 @@ SEL sel_register_typed_name(const char *name, const char *type);
 __attribute__((deprecated))
 BOOL sel_eq(SEL s1, SEL s2);
 
+enum {
+    OBJC_ASSOCIATION_ASSIGN = 0,
+    OBJC_ASSOCIATION_RETAIN_NONATOMIC = 1,
+    OBJC_ASSOCIATION_COPY_NONATOMIC = 3,
+    OBJC_ASSOCIATION_RETAIN = 01401,
+    OBJC_ASSOCIATION_COPY = 01403
+};
+typedef uintptr_t objc_AssociationPolicy;
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
 
+extern void objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationPolicy policy);
+extern id objc_getAssociatedObject(id object, const void *key);
+extern void objc_removeAssociatedObjects(id object);
+
+#if defined(__cplusplus)
+}
+#endif
+    
 #define _C_ID       '@'
 #define _C_CLASS    '#'
 #define _C_SEL      ':'
@@ -450,6 +469,5 @@ BOOL sel_eq(SEL s1, SEL s2);
 #define _C_OUT      'o'
 #define _C_BYCOPY   'O'
 #define _C_ONEWAY   'V'
-
 
 #endif // __LIBOBJC_RUNTIME_H_INCLUDED__

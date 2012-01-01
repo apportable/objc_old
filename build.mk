@@ -46,5 +46,6 @@ OBJECTS = \
 	statics_loader.o \
 	sync.o \
 	toydispatch.o \
+	associations.o \
 
 include $(ROOTDIR)/module.mk
