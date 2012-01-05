@@ -7,6 +7,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#if !defined(VERDE_DEBUG)
+#include <android/log.h>
+#define  VERDE_DEBUG(...) __android_log_print(ANDROID_LOG_INFO,"objc",__VA_ARGS__)
+#endif
+
 void objc_send_initialize(id object);
 
 // Removed __thread because __thread isn't supported on Windows.
