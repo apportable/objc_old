@@ -100,10 +100,10 @@ static dispatch_queue_t main_queue = NULL;
 
 static void create_main_queue() {
 	if (main_queue == NULL) {
-		dispatch_queue_t queue = calloc(1, sizeof(struct dispatch_queue));
-		queue->refcount = 1;
-		pthread_cond_init(&queue->conditionVariable, NULL);
-		pthread_mutex_init(&queue->mutex, NULL);
+		main_queue = calloc(1, sizeof(struct dispatch_queue));
+		main_queue->refcount = 1;
+		pthread_cond_init(&main_queue->conditionVariable, NULL);
+		pthread_mutex_init(&main_queue->mutex, NULL);
 		// The main queue does not get its own runloop and thread.
 		// The main queue must be processed on the main thread and
 		// will be handled via VerdeKitContinue( )
