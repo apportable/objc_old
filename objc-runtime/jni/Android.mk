@@ -16,6 +16,7 @@ LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/lib
 LOCAL_MODULE    := objc
 LOCAL_ARM_MODE  := arm
 LOCAL_CFLAGS    +=  \
+                    -Werror-return-type \
                     -DTYPE_DEPENDENT_DISPATCH \
                     -DGNUSTEP \
                     -D_XOPEN_SOURCE=500 \
