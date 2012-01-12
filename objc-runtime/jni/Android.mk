@@ -2,6 +2,7 @@ LOCAL_PATH := $(call my-dir)
 
 # Build Objective-C Runtime
 include $(CLEAR_VARS)
+BUILD            ?= release
 TARGET_OS        := android
 HOST_OS          ?= Darwin
 FRONTEND         ?= clang
@@ -24,6 +25,13 @@ LOCAL_CFLAGS    +=  \
                     -fblocks \
                     -DMAP_TABLE_NO_LOCK \
                     -DANDROID \
+
+ifeq ($(BUILD), release)
+  LOCAL_CFLAGS += \
+    -O2 \
+    -DNDEBUG \
+
+endif
 
 LOCAL_OBJCFLAGS += -ferror-limit=5 -fblocks -DNS_BLOCKS_AVAILABLE
 

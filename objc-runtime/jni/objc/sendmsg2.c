@@ -3,14 +3,10 @@
 #include "dtable.h"
 #include "selector.h"
 #include "loader.h"
+#include "objc_debug.h"
 #include "objc/hooks.h"
 #include <stdint.h>
 #include <stdio.h>
-
-#if !defined(VERDE_DEBUG)
-#include <android/log.h>
-#define  VERDE_DEBUG(...) __android_log_print(ANDROID_LOG_INFO,"objc",__VA_ARGS__)
-#endif
 
 void objc_send_initialize(id object);
 
@@ -21,7 +17,7 @@ static id nil_method(id self, SEL _cmd) {
 #ifndef NDEBUG
   const char *name = sel_getName(_cmd);
   if (self && strcmp(name, "release")) {
-      VERDE_DEBUG("Missing implementation of %s %s", self == NULL ? "<INVALID>" : class_getName(object_getClass(self)), name);
+      DEBUG_LOG("Missing implementation of %s %s", self == NULL ? "<INVALID>" : class_getName(object_getClass(self)), name);
   }
 #endif
   return nil;
