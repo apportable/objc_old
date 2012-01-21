@@ -7,6 +7,7 @@
 
 #import <map>
 #include "objc/runtime.h"
+#include "objc_debug.h"
 
 typedef std::map<const void *, objc_AssociationPolicy> ObjCPolicy;
 typedef std::map<const void *, id> ObjCBinding;
@@ -15,6 +16,8 @@ typedef std::map<id, ObjCBinding> ObjCBindingMap;
 
 static ObjCPolicyMap policies;
 static ObjCBindingMap associations;
+
+extern "C" int __objc_finalizers_imminent = 0; 
 
 void objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationPolicy policy)
 {
@@ -55,7 +58,7 @@ id objc_getAssociatedObject(id object, const void *key)
 
 void objc_removeAssociatedObjects(id object)
 {
-    if(!object)
+    if(!object || __objc_finalizers_imminent)
         return;
     // Technically this should be syncrhonized to avoid stepping on the toes of another remove op or another set/get op
     // but if you are playing with this api, it is the caller's responsability to make sure it is dealt with in a thread
@@ -64,6 +67,7 @@ void objc_removeAssociatedObjects(id object)
     ObjCBindingMap::iterator bindings = associations.find(object);
     if(bindings != associations.end())
     {
+        DEBUG_LOG("nuking objects");
         for(ObjCBinding::iterator it = bindings->second.begin(); it != bindings->second.end(); ++it) 
         {
             switch(policies[object][it->first])
