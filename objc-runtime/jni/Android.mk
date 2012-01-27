@@ -2,20 +2,21 @@ LOCAL_PATH := $(call my-dir)
 
 # Build Objective-C Runtime
 include $(CLEAR_VARS)
+TARGET_ARCH_ABI       ?= armeabi-7a
 BUILD            ?= release
 TARGET_OS        := android
 HOST_OS          ?= Darwin
 FRONTEND         ?= clang
 ROOTDIR          := $(LOCAL_PATH)
 MODULE           := objc
-BINDIR           := $(abspath $(ROOTDIR)/../obj/local/armeabi/objs/ )
+BINDIR           := $(abspath $(ROOTDIR)/../obj/local/$(TARGET_ARCH_ABI)/objs/ )
 ANDROID_NDK_ROOT :=/Developer/DestinyCloudFist/crystax-ndk-r7
 ANDROID_SDK_ROOT :=/Developer/DestinyCloudFist/android-sdk-mac_x86
 
 LOCAL_ASFLAGS   := -shared -Wl,-Bsymbolic 
-LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/armeabi/4.4.3/ -lgnustl_shared
+LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/4.4.3/ -lgnustl_shared
 LOCAL_MODULE    := objc
-LOCAL_ARM_MODE  := arm
+#LOCAL_ARM_MODE  := arm
 LOCAL_CFLAGS    +=  \
                     -Werror-return-type \
                     -DTYPE_DEPENDENT_DISPATCH \
@@ -55,12 +56,28 @@ LOCAL_CFLAGS    +=  \
                     -funwind-tables \
                     -fstack-protector \
                     -fno-short-enums \
-                    -D__ARM_ARCH_5__ \
                     -D__ANDROID__  \
                     -DAPPORTABLE \
-                    -march=armv5 \
-                    -msoft-float \
                     -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm/usr/include/ \
+
+
+ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
+  LOCAL_CFLAGS += \
+      -mfloat-abi=softfp
+      -march=armv7-a \
+      -mfpu=vfp \
+
+  MODULE_ASFLAGS += \
+      -mfloat-abi=softfp
+      -march=armv7-a  \
+
+else
+  COMMON_CCFLAGS += \
+      -D__ARM_ARCH_5__ \
+      -march=armv5 \
+      -msoft-float \
+
+endif
 
 
 LOCAL_SRC_FILES :=  \
@@ -98,7 +115,7 @@ LOCAL_SRC_FILES += unwind_stubs.o
 OBJECTS:=$(LOCAL_SRC_FILES)
 
 CXX_SYSTEM = -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/include/4.4.3/ \
-             -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/armeabi/4.4.3/include/ \
+             -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/4.4.3/include/ \
              -isystem $(ANDROID_NDK_ROOT)/sources/crystax/include \
 
 CCLD=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/darwin-x86/bin/arm-linux-androideabi-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-arm
