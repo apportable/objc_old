@@ -7,6 +7,7 @@ BUILD            ?= release
 TARGET_OS        := android
 HOST_OS          ?= Darwin
 FRONTEND         ?= clang
+CLANG_VERSION    ?= 3.1
 ROOTDIR          := $(LOCAL_PATH)
 MODULE           := objc
 BINDIR           := $(abspath $(ROOTDIR)/../obj/local/$(TARGET_ARCH_ABI)/objs/ )
@@ -120,8 +121,8 @@ CXX_SYSTEM = -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/include/
 
 CCLD=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/darwin-x86/bin/arm-linux-androideabi-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-arm
 
-CC= /Developer/DestinyCloudFist/clang-2.9/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm $(CXX_SYSTEM) -ccc-host-triple arm-linux-eabi -march=armv5
-CPP= /Developer/DestinyCloudFist/clang-2.9/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm  $(CXX_SYSTEM)
+CC= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm $(CXX_SYSTEM) -ccc-host-triple arm-android-eabi -march=armv5 -D__compiler_offsetof=__builtin_offsetof
+CPP= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm  $(CXX_SYSTEM)
 
 CCAS=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/darwin-x86/bin/arm-linux-androideabi-gcc
 AS=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/darwin-x86/bin/arm-linux-androideabi-as
