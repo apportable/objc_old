@@ -15,6 +15,7 @@ ANDROID_SDK_ROOT :=/Developer/DestinyCloudFist/android-sdk-mac_x86
 
 LOCAL_ASFLAGS   := -shared -Wl,-Bsymbolic 
 LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/4.4.3/ -lgnustl_shared
+LOCAL_LDLIBS    += -Wl,--build-id
 LOCAL_MODULE    := objc
 #LOCAL_ARM_MODE  := arm
 LOCAL_CFLAGS    +=  \
