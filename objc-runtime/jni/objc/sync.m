@@ -54,13 +54,8 @@ enum {
 // in time, keep them on a single list.
 //
 
-void __objc_sync_init(void)
-{
-	//INIT_LOCK(at_sync_init_lock);
-}
-
 #define require_noerr_string(err, label, msg) if (err != 0) { DEBUG_LOG("%s", msg); goto label; }
-#define require_action_string(action, label, result, msg) if((action)) { result; DEBUG_LOG("%s", msg); goto label; }
+#define require_action_string(action, label, result, msg) if(!(action)) { result; DEBUG_LOG("%s", msg); goto label; }
 
 static pthread_mutexattr_t	sRecursiveLockAttr;
 static bool			sRecursiveLockAttrIntialized = false;
@@ -146,7 +141,23 @@ done:
     return result;
 }
 
-
+void __objc_sync_init(void)
+{
+	SyncData* result = NULL;
+	int err;
+	pthread_mutex_lock(&sTableLock);
+	result = (SyncData*)malloc(sizeof(SyncData));
+	result->object = NULL;
+    result->lockCount = 0;
+    err = pthread_mutex_init(&result->mutex, recursiveAttributes());
+    require_noerr_string(err, done, "pthread_mutex_init failed");
+    err = pthread_cond_init(&result->conditionVariable, NULL);
+    require_noerr_string(err, done, "pthread_cond_init failed");
+    result->nextData = sDataList;
+    sDataList = result;
+done:
+    pthread_mutex_unlock(&sTableLock);
+}
 
 // Begin synchronizing on 'obj'.  
 // Allocates recursive pthread_mutex associated with 'obj' if needed.
