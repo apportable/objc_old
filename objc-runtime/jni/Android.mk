@@ -50,6 +50,8 @@ LOCAL_CFLAGS    +=  \
                     -funwind-tables \
                     -fstack-protector \
                     -fno-short-enums \
+                    -fobjc-nonfragile-abi \
+                    -fobjc-nonfragile-abi-version=1 \
                     -DHAVE_GCC_VISIBILITY \
                     -g \
                     -fpic \
