@@ -1,146 +1,271 @@
-#include "objc/runtime.h"
-#include "lock.h"
-#include "class.h"
-#include "dtable.h"
+/*
+ * Copyright (c) 1999 Apple Computer, Inc. All rights reserved.
+ *
+ * @APPLE_LICENSE_HEADER_START@
+ * 
+ * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
+ * 
+ * This file contains Original Code and/or Modifications of Original Code
+ * as defined in and that are subject to the Apple Public Source License
+ * Version 2.0 (the 'License'). You may not use this file except in
+ * compliance with the License. Please obtain a copy of the License at
+ * http://www.opensource.apple.com/apsl/ and read it before using this
+ * file.
+ * 
+ * The Original Code and all software distributed under the License are
+ * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
+ * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+ * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
+ * Please see the License for the specific language governing rights and
+ * limitations under the License.
+ * 
+ * @APPLE_LICENSE_HEADER_END@
+ */
+//
+//  objc_sync.h
+//
+//  Copyright (c) 2002 Apple Computer, Inc. All rights reserved.
+//
 
-#include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
+#include <sys/time.h>
+#include <pthread.h>
+#define PTHREAD_MUTEX_RECURSIVE          2
+#include <errno.h>
+#include "objc_debug.h"
 
-#ifdef __clang__
-#define SELECTOR(x) @selector(x)
-#else
-#define SELECTOR(x) (SEL)@selector(x)
-#endif
+enum {
+	OBJC_SYNC_SUCCESS                 = 0,
+	OBJC_SYNC_NOT_OWNING_THREAD_ERROR = -1,
+	OBJC_SYNC_TIMED_OUT               = -2,
+	OBJC_SYNC_NOT_INITIALIZED         = -3		
+};
 
-int snprintf(char *restrict s, size_t n, const char *restrict format, ...);
+//
+// Code by Nick Kledzik
+//
 
-@interface Fake
-+ (void)dealloc;
-@end
+// revised comments by Blaine
 
-static mutex_t at_sync_init_lock;
+//
+// Allocate a lock only when needed.  Since few locks are needed at any point
+// in time, keep them on a single list.
+//
 
 void __objc_sync_init(void)
 {
-	INIT_LOCK(at_sync_init_lock);
+	//INIT_LOCK(at_sync_init_lock);
 }
 
-IMP objc_msg_lookup(id, SEL);
+#define require_noerr_string(err, label, msg) if (err != 0) { DEBUG_LOG("%s", msg); goto label; }
+#define require_action_string(action, label, result, msg) if((action)) { result; DEBUG_LOG("%s", msg); goto label; }
 
-static void deallocLockClass(id obj, SEL _cmd);
+static pthread_mutexattr_t	sRecursiveLockAttr;
+static bool			sRecursiveLockAttrIntialized = false;
 
-static inline Class findLockClass(id obj)
+static pthread_mutexattr_t* recursiveAttributes()
 {
-	struct objc_object object = { obj->isa };
-	while (Nil != object.isa && 
-	       !objc_test_class_flag(object.isa, objc_class_flag_lock_class))
-	{
-		object.isa = class_getSuperclass(object.isa);
-	}
-	return object.isa;
+    if ( !sRecursiveLockAttrIntialized ) {
+	int err = pthread_mutexattr_init(&sRecursiveLockAttr);
+        require_noerr_string(err, done, "pthread_mutexattr_init failed");
+
+	err = pthread_mutexattr_settype(&sRecursiveLockAttr, PTHREAD_MUTEX_RECURSIVE);
+        require_noerr_string(err, done, "pthread_mutexattr_settype failed");
+
+	sRecursiveLockAttrIntialized = true;
+   }
+
+done:
+    return &sRecursiveLockAttr;
 }
 
-static Class allocateLockClass(Class superclass)
+
+struct SyncData
 {
-	Class newClass = calloc(1, sizeof(struct objc_class) + sizeof(mutex_t));
+	struct SyncData*	nextData;
+	id			object;
+	unsigned int		lockCount;
+	pthread_mutex_t 	mutex;
+	pthread_cond_t		conditionVariable;
+};
+typedef struct SyncData SyncData;
 
-	if (Nil == newClass) { return Nil; }
+static pthread_mutex_t		sTableLock = PTHREAD_MUTEX_INITIALIZER;
+static SyncData*		sDataList = NULL;
 
-	// Set up the new class
-	newClass->isa = superclass->isa;
-	// Set the superclass pointer to the name.  The runtime will fix this when
-	// the class links are resolved.
-	newClass->name = superclass->name;
-	newClass->info = objc_class_flag_resolved | objc_class_flag_initialized |
-		objc_class_flag_class | objc_class_flag_user_created |
-		objc_class_flag_new_abi | objc_class_flag_hidden_class |
-		objc_class_flag_lock_class;
-	newClass->super_class = superclass;
-	newClass->dtable = objc_copy_dtable_for_class(superclass->dtable, newClass);
-	newClass->instance_size = superclass->instance_size;
-	if (objc_test_class_flag(superclass, objc_class_flag_meta))
-	{
-		newClass->info |= objc_class_flag_meta;
-	}
-	mutex_t *lock = object_getIndexedIvars(newClass);
-	INIT_LOCK(*lock);
-
-	return newClass;
-}
-
-static inline Class initLockObject(id obj)
+static SyncData* id2data(id object)
 {
-	Class lockClass = allocateLockClass(obj->isa); 
-	if (class_isMetaClass(obj->isa))
-	{
-		obj->isa = lockClass;
-	}
-	else
-	{
-		const char *types =
-			method_getTypeEncoding(class_getInstanceMethod(obj->isa,
-						SELECTOR(dealloc)));
-		class_addMethod(lockClass, SELECTOR(dealloc), (IMP)deallocLockClass,
-				types);
-		obj->isa = lockClass;
-	}
-
-	return lockClass;
+    SyncData* result = NULL;
+    int err;
+    
+    pthread_mutex_lock(&sTableLock);
+    
+    // Walk in-use list looking for matching object
+    // sTableLock keeps other threads from winning an allocation race
+    // for the same new object.
+    // We could keep the nodes in some hash table if we find that there are
+    // more than 20 or so distinct locks active, but we don't do that now.
+    
+    SyncData* firstUnused = NULL;
+    SyncData* p;
+    for (p = sDataList; p != NULL; p = p->nextData) {
+        if ( p->object == object ) {
+            result = p;
+            goto done;
+        }
+        if ( (firstUnused == NULL) && (p->object == NULL) )
+            firstUnused = p;
+    }
+    
+    // if no corresponding SyncData found, but an unused one was found, use it
+    if ( firstUnused != NULL ) {
+        result = firstUnused;
+        result->object = object;
+        result->lockCount = 0;	// sanity
+        goto done;
+    }
+                            
+    // malloc a new SyncData and add to list.
+    // XXX calling malloc with a global lock held is bad practice,
+    // might be worth releasing the lock, mallocing, and searching again.
+    // But since we never free these guys we won't be stuck in malloc very often.
+    result = (SyncData*)malloc(sizeof(SyncData));
+    result->object = object;
+    result->lockCount = 0;
+    err = pthread_mutex_init(&result->mutex, recursiveAttributes());
+    require_noerr_string(err, done, "pthread_mutex_init failed");
+    err = pthread_cond_init(&result->conditionVariable, NULL);
+    require_noerr_string(err, done, "pthread_cond_init failed");
+    result->nextData = sDataList;
+    sDataList = result;
+    
+done:
+    pthread_mutex_unlock(&sTableLock);
+    return result;
 }
 
-static void deallocLockClass(id obj, SEL _cmd)
+
+
+// Begin synchronizing on 'obj'.  
+// Allocates recursive pthread_mutex associated with 'obj' if needed.
+// Returns OBJC_SYNC_SUCCESS once lock is acquired.  
+int objc_sync_enter(id obj)
 {
-	Class lockClass = findLockClass(obj);
-	Class realClass = class_getSuperclass(lockClass);
-	// Call the real -dealloc method (this ordering is required in case the
-	// user does @synchronized(self) in -dealloc)
-	struct objc_super super = {obj, realClass };
-	objc_msgSendSuper(&super, SELECTOR(dealloc));
-	// After calling [super dealloc], the object will no longer exist.
-	// Free the lock
-	mutex_t *lock = object_getIndexedIvars(lockClass);
-	DESTROY_LOCK(lock);
-
-	// FIXME: Low memory profile.
-	SparseArrayDestroy(lockClass->dtable);
-
-	// Free the class
-	free(lockClass);
+    int result = OBJC_SYNC_SUCCESS;
+    
+    SyncData* data = id2data(obj);
+    require_action_string(data != NULL, done, result = OBJC_SYNC_NOT_INITIALIZED, "id2data failed");
+	
+    result = pthread_mutex_lock(&data->mutex);
+    require_noerr_string(result, done, "pthread_mutex_lock failed");
+	
+    data->lockCount++;	// note: lockCount is only modified when corresponding mutex is held
+	
+done: 
+    return result;
 }
 
-// TODO: This should probably have a special case for classes conforming to the
-// NSLocking protocol, just sending them a -lock message.
-void objc_sync_enter(id obj)
+
+// End synchronizing on 'obj'. 
+// Returns OBJC_SYNC_SUCCESS or OBJC_SYNC_NOT_OWNING_THREAD_ERROR
+int objc_sync_exit(id obj)
 {
-#ifndef ANDROID
-	return; // JACKSON!
-#endif
-    if(obj == NULL)
-        return;
-	Class lockClass = findLockClass(obj);
-	if (Nil == lockClass)
-	{
-		LOCK(&at_sync_init_lock);
-		// Test again in case two threads call objc_sync_enter at once
-		lockClass = findLockClass(obj);
-		if (Nil == lockClass)
-		{
-			lockClass = initLockObject(obj);
-		}
-		UNLOCK(&at_sync_init_lock);
-	}
-	mutex_t *lock = object_getIndexedIvars(lockClass);
-	LOCK(lock);
+    int result = OBJC_SYNC_SUCCESS;
+    
+    SyncData* data;
+    data = id2data(obj); // XXX should assert that we didn't create it
+    require_action_string(data != NULL, done, result = OBJC_SYNC_NOT_INITIALIZED, "id2data failed");
+
+    int oldLockCount = data->lockCount--;
+    if ( oldLockCount == 1 ) {
+        // XXX should move off the main chain to speed id2data searches
+        data->object = NULL;	// recycle data
+    }
+    
+    result = pthread_mutex_unlock(&data->mutex);
+    require_noerr_string(result, done, "pthread_mutex_unlock failed");
+	
+done:
+    if ( result == EPERM )
+        result = OBJC_SYNC_NOT_OWNING_THREAD_ERROR;
+
+    return result;
 }
 
-void objc_sync_exit(id obj)
+
+// Temporarily release lock on 'obj' and wait for another thread to notify on 'obj'
+// Return OBJC_SYNC_SUCCESS, OBJC_SYNC_NOT_OWNING_THREAD_ERROR, OBJC_SYNC_TIMED_OUT, OBJC_SYNC_INTERRUPTED
+int objc_sync_wait(id obj, long long milliSecondsMaxWait)
 {
-#ifndef ANDROID
-	return; // JACKSON!
-#endif
-    if(obj == NULL)
-        return;
-	Class lockClass = findLockClass(obj);
-	mutex_t *lock = object_getIndexedIvars(lockClass);
-	UNLOCK(lock);
+    int result = OBJC_SYNC_SUCCESS;
+            
+    SyncData* data = id2data(obj);
+    require_action_string(data != NULL, done, result = OBJC_SYNC_NOT_INITIALIZED, "id2data failed");
+    
+    
+    // XXX need to retry cond_wait under out-of-our-control failures
+    if ( milliSecondsMaxWait == 0 ) {
+        result = pthread_cond_wait(&data->conditionVariable, &data->mutex);
+        require_noerr_string(result, done, "pthread_cond_wait failed");
+    }
+    else {
+       	struct timespec maxWait;
+        maxWait.tv_sec  = milliSecondsMaxWait / 1000;
+        maxWait.tv_nsec = (milliSecondsMaxWait - (maxWait.tv_sec * 1000)) * 1000000;
+        result = pthread_cond_timedwait(&data->conditionVariable, &data->mutex, &maxWait);
+     	require_noerr_string(result, done, "pthread_cond_timedwait failed");
+    }
+    // no-op to keep compiler from complaining about branch to next instruction
+    data = NULL;
+
+done:
+    if ( result == EPERM )
+        result = OBJC_SYNC_NOT_OWNING_THREAD_ERROR;
+    else if ( result == ETIMEDOUT )
+        result = OBJC_SYNC_TIMED_OUT;
+    
+    return result;
 }
+
+
+// Wake up another thread waiting on 'obj'
+// Return OBJC_SYNC_SUCCESS, OBJC_SYNC_NOT_OWNING_THREAD_ERROR
+int objc_sync_notify(id obj)
+{
+    int result = OBJC_SYNC_SUCCESS;
+        
+    SyncData* data = id2data(obj);
+    require_action_string(data != NULL, done, result = OBJC_SYNC_NOT_INITIALIZED, "id2data failed");
+
+    result = pthread_cond_signal(&data->conditionVariable);
+    require_noerr_string(result, done, "pthread_cond_signal failed");
+
+done:
+    if ( result == EPERM )
+        result = OBJC_SYNC_NOT_OWNING_THREAD_ERROR;
+    
+    return result;
+}
+
+
+// Wake up all threads waiting on 'obj'
+// Return OBJC_SYNC_SUCCESS, OBJC_SYNC_NOT_OWNING_THREAD_ERROR
+int objc_sync_notifyAll(id obj)
+{
+    int result = OBJC_SYNC_SUCCESS;
+        
+    SyncData* data = id2data(obj);
+    require_action_string(data != NULL, done, result = OBJC_SYNC_NOT_INITIALIZED, "id2data failed");
+
+    result = pthread_cond_broadcast(&data->conditionVariable);
+    require_noerr_string(result, done, "pthread_cond_broadcast failed");
+
+done:
+    if ( result == EPERM )
+        result = OBJC_SYNC_NOT_OWNING_THREAD_ERROR;
+    
+    return result;
+}
+
