@@ -27,14 +27,19 @@
 //
 //  Copyright (c) 2002 Apple Computer, Inc. All rights reserved.
 //
-
+#define BACKTRACE_LOCKS 1
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <pthread.h>
-#define PTHREAD_MUTEX_RECURSIVE          2
 #include <errno.h>
 #include "objc_debug.h"
+//
+// Code by Nick Kledzik
+//
+
+// revised comments by Blaine
+// revised for android by Philippe Hausler, Apportable Inc 
 
 enum {
 	OBJC_SYNC_SUCCESS                 = 0,
@@ -43,19 +48,29 @@ enum {
 	OBJC_SYNC_NOT_INITIALIZED         = -3		
 };
 
-//
-// Code by Nick Kledzik
-//
+static inline const char *sync_error(int err)
+{
+	switch(err)
+	{
+		case EDEADLK:
+			DEBUG_BREAK();
+			return "EDEADLK";
+		case EINVAL:
+			return "EINVAL";
+		case EPERM:
+			return "EPERM";
+		default:
+			return "Unknown";
+	}
+}
 
-// revised comments by Blaine
+#define require_noerr_string(err, label, msg) if (err != 0) { DEBUG_LOG("%s err = %s", msg, sync_error(err)); goto label; }
+#define require_action_string(action, label, result, msg) if(!(action)) { result; DEBUG_LOG("%s", msg); goto label; }
 
 //
 // Allocate a lock only when needed.  Since few locks are needed at any point
 // in time, keep them on a single list.
 //
-
-#define require_noerr_string(err, label, msg) if (err != 0) { DEBUG_LOG("%s", msg); goto label; }
-#define require_action_string(action, label, result, msg) if(!(action)) { result; DEBUG_LOG("%s", msg); goto label; }
 
 static pthread_mutexattr_t	sRecursiveLockAttr;
 static bool			sRecursiveLockAttrIntialized = false;
@@ -63,27 +78,27 @@ static bool			sRecursiveLockAttrIntialized = false;
 static pthread_mutexattr_t* recursiveAttributes()
 {
     if ( !sRecursiveLockAttrIntialized ) {
-	int err = pthread_mutexattr_init(&sRecursiveLockAttr);
-        require_noerr_string(err, done, "pthread_mutexattr_init failed");
+		int err = pthread_mutexattr_init(&sRecursiveLockAttr);
+		require_noerr_string(err, done, "pthread_mutexattr_init failed");
 
-	err = pthread_mutexattr_settype(&sRecursiveLockAttr, PTHREAD_MUTEX_RECURSIVE);
-        require_noerr_string(err, done, "pthread_mutexattr_settype failed");
+		err = pthread_mutexattr_settype(&sRecursiveLockAttr, PTHREAD_MUTEX_RECURSIVE);
+		require_noerr_string(err, done, "pthread_mutexattr_settype failed");
 
-	sRecursiveLockAttrIntialized = true;
+		sRecursiveLockAttrIntialized = true;
    }
 
 done:
     return &sRecursiveLockAttr;
 }
 
-
 struct SyncData
 {
-	struct SyncData*	nextData;
-	id			object;
-	unsigned int		lockCount;
-	pthread_mutex_t 	mutex;
-	pthread_cond_t		conditionVariable;
+	struct SyncData *       nextData;
+	id						object;
+	unsigned int			lockCount;
+	pthread_mutex_t			mutex;
+	pthread_cond_t			conditionVariable;
+	pthread_t      			thread;
 };
 typedef struct SyncData SyncData;
 
@@ -135,7 +150,7 @@ static SyncData* id2data(id object)
     require_noerr_string(err, done, "pthread_cond_init failed");
     result->nextData = sDataList;
     sDataList = result;
-    
+
 done:
     pthread_mutex_unlock(&sTableLock);
     return result;
@@ -171,7 +186,7 @@ int objc_sync_enter(id obj)
 	
     result = pthread_mutex_lock(&data->mutex);
     require_noerr_string(result, done, "pthread_mutex_lock failed");
-	
+	data->thread = pthread_self();
     data->lockCount++;	// note: lockCount is only modified when corresponding mutex is held
 	
 done: 
