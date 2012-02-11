@@ -39,7 +39,7 @@ Slot_t (*__objc_msg_forward3)(id receiver, SEL op) = objc_msg_forward3_null;
 static struct objc_slot* objc_selector_type_mismatch(Class cls, SEL
 		selector, Slot_t result)
 {
-	fprintf(stderr, "Calling [%s %c%s] with incorrect signature.  "
+	DEBUG_LOG("Calling [%s %c%s] with incorrect signature.  "
 			"Method has %s, selector has %s\n",
 			cls->name,
 			class_isMetaClass(cls) ? '+' : '-',
