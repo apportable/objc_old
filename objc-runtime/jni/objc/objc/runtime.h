@@ -12,6 +12,10 @@
 #include <sys/types.h>
 #include "Availability.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 // Undo GNUstep substitutions
 #ifdef class_setVersion 
 #	undef class_setVersion
@@ -415,13 +419,14 @@ enum {
 };
 typedef uintptr_t objc_AssociationPolicy;
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 extern void objc_setAssociatedObject(id object, const void *key, id value, objc_AssociationPolicy policy);
 extern id objc_getAssociatedObject(id object, const void *key);
 extern void objc_removeAssociatedObjects(id object);
+
+#if defined(TRACK_OBJC_ALLOCATIONS)
+extern void track_allocation(Class aClass);
+extern void track_deallocation(Class aClass);
+#endif
 
 #if defined(__cplusplus)
 }

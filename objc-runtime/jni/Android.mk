@@ -13,6 +13,7 @@ MODULE           := objc
 BINDIR           := $(abspath $(ROOTDIR)/../obj/local/$(TARGET_ARCH_ABI)/objs/ )
 ANDROID_NDK_ROOT :=/Developer/DestinyCloudFist/crystax-ndk-r7
 ANDROID_SDK_ROOT :=/Developer/DestinyCloudFist/android-sdk-mac_x86
+TRACK_OBJC_ALLOCATIONS := no
 
 LOCAL_ASFLAGS   := -shared -Wl,-Bsymbolic 
 LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/4.4.3/ -lgnustl_shared
@@ -66,6 +67,12 @@ LOCAL_CFLAGS    +=  \
                     -nostdinc \
                     -I/$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/arm-linux-androideabi/4.4.3/include/ \
 
+
+ifeq ($(TRACK_OBJC_ALLOCATIONS),yes)
+  LOCAL_CFLAGS += \
+    -DTRACK_OBJC_ALLOCATIONS=1 \
+
+endif
 
 
 ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
