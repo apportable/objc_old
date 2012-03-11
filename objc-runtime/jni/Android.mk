@@ -13,7 +13,7 @@ MODULE           := objc
 BINDIR           := $(abspath $(ROOTDIR)/../obj/local/$(TARGET_ARCH_ABI)/objs/ )
 ANDROID_NDK_ROOT :=/Developer/DestinyCloudFist/crystax-ndk-r7
 ANDROID_SDK_ROOT :=/Developer/DestinyCloudFist/android-sdk-mac_x86
-TRACK_OBJC_ALLOCATIONS := no
+TRACK_OBJC_ALLOCATIONS ?= no
 
 LOCAL_ASFLAGS   := -shared -Wl,-Bsymbolic 
 LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/4.4.3/ -lgnustl_shared
