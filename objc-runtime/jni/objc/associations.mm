@@ -107,21 +107,22 @@ void objc_removeAssociatedObjects(id object)
 }
 
 #if defined(TRACK_OBJC_ALLOCATIONS)
-
-static std::map<Class, int> allocations;
+#import <string>
+static std::map<std::string, int> allocations;
 static long counter = 0;
 #define LOG_INTERVAL 1000
  
 void track_allocation(Class aClass) 
 {
-	allocations[aClass] = allocations[aClass] + 1;
+	std::string name(class_getName(aClass));
+	allocations[name] = allocations[name] + 1;
 	counter++;
 	if (counter == LOG_INTERVAL) {
         counter = 0;
 		DEBUG_LOG("########################### ALLOCATIONS! ####################################");
-		for(std::map<Class, int>::iterator it = allocations.begin(); it != allocations.end(); ++it)
+		for(std::map<std::string, int>::iterator it = allocations.begin(); it != allocations.end(); ++it)
 	    {
-	    	DEBUG_LOG("%s: %d", class_getName(it->first), it->second);
+	    	DEBUG_LOG("%s: %d", it->first.c_str(), it->second);
 	    }
 	    DEBUG_LOG("#############################################################################");
 	}
@@ -129,7 +130,8 @@ void track_allocation(Class aClass)
  
 void track_deallocation(Class aClass)
 {
-	allocations[aClass] = allocations[aClass] - 1;
+	std::string name(class_getName(aClass));
+	allocations[name] = allocations[name] - 1;
 }
 
 #endif
