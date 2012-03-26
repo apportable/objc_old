@@ -11,6 +11,10 @@
  */
 
 /* If the real libdispatch exists, use that instead of the toy one. */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if !defined(__has_include)
 #define __has_include(x) 0
 #endif
@@ -25,6 +29,7 @@
 typedef void (^dispatch_block_t)(void);
 #endif
 
+typedef long dispatch_once_t;
 typedef uint64_t dispatch_time_t;
 
 #ifdef NSEC_PER_SEC
@@ -87,3 +92,7 @@ void dispatch_retain(dispatch_queue_t queue);
 
 dispatch_time_t dispatch_time(dispatch_time_t base, int64_t offset);
 
+void dispatch_once(dispatch_once_t *predicate, dispatch_block_t block);
+#ifdef __cplusplus
+}
+#endif
