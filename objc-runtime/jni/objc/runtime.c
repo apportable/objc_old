@@ -641,3 +641,28 @@ void objc_registerClassPair(Class cls)
 	LOCK_UNTIL_RETURN(__objc_runtime_mutex);
 	class_table_insert(cls);
 }
+
+static Class NSAutoreleasePoolClass = NULL;
+static IMP allocImp = NULL;
+static IMP initImp = NULL;
+static IMP drainImp = NULL;
+
+void objc_autoreleasePoolPop(void *obj)
+{
+	if (drainImp == NULL)
+		drainImp = method_getImplementation(class_getInstanceMethod(NSAutoreleasePoolClass, sel_registerName("drain")));
+	drainImp(obj, sel_getUid("drain"));
+}
+
+void *objc_autoreleasePoolPush(void)
+{
+	if (NSAutoreleasePoolClass == NULL)
+		NSAutoreleasePoolClass = objc_getClass("NSAutoreleasePool");
+	if (allocImp == NULL)
+		allocImp = method_getImplementation(class_getClassMethod(NSAutoreleasePoolClass, sel_registerName("alloc")));
+	if (initImp == NULL)
+		initImp = method_getImplementation(class_getInstanceMethod(NSAutoreleasePoolClass, sel_registerName("init")));
+	void *obj = allocImp(NSAutoreleasePoolClass, sel_getUid("alloc"));
+	obj = initImp(obj, sel_getUid("init"));
+	return obj;
+}
