@@ -1,4 +1,4 @@
-
+#if defined(__arm__)
 void * _Unwind_GetIP(void *context) {
 	return (void*)0;
 }
@@ -14,4 +14,4 @@ void _Unwind_SetGR(void *context, int index, unsigned int value) {
 
 void _Unwind_SetIP(void *context, unsigned int value) {
 }
-
+#endif

@@ -173,6 +173,7 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 /**
  * The exception personality function.  
  */
+
 _Unwind_Reason_Code  __gnu_objc_personality_v0(int version,
                                                _Unwind_Action actions,
                                                uint64_t exceptionClass,
@@ -302,4 +303,14 @@ _Unwind_Reason_Code  __gnu_objc_personality_v0(int version,
 	_Unwind_SetGR(context, __builtin_eh_return_data_regno(1), selector);
 
 	return _URC_INSTALL_CONTEXT;
+}
+
+
+_Unwind_Reason_Code  __gnustep_objcxx_personality_v0(int version,
+                                               _Unwind_Action actions,
+                                               uint64_t exceptionClass,
+                                               struct _Unwind_Exception *exceptionObject,
+                                               struct _Unwind_Context *context)
+{
+	return __gnu_objc_personality_v0(version, actions, exceptionClass, exceptionObject, context);
 }
