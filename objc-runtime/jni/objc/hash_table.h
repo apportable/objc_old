@@ -534,8 +534,11 @@ PREFIX(_current)(PREFIX(_table) *table,
 #	undef MAP_TABLE_NO_LOCK
 #endif
 
+#if !defined(APPORTABLE)
+// TODO(jackson): Understand what this is and why we want it
 #ifdef MAP_TABLE_SINGLE_THREAD
 #	undef MAP_TABLE_SINGLE_THREAD
+#endif
 #endif
 
 #undef MAP_TABLE_VALUE_NULL

@@ -29,6 +29,7 @@ LOCAL_CFLAGS    +=  \
                     -fblocks \
                     -DMAP_TABLE_NO_LOCK \
                     -DANDROID \
+                    -DMAP_TABLE_SINGLE_THREAD \
 
 ifeq ($(BUILD), release)
   LOCAL_CFLAGS += \
