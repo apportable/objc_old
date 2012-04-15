@@ -138,7 +138,6 @@ LOCAL_SRC_FILES :=  \
                     sendmsg2.o \
                     statics_loader.o \
                     sync.o \
-                    toydispatch.o \
                     associations.o \
 
 # libunwind stubs
