@@ -6,6 +6,7 @@
 #include "method_list.h"
 #include "lock.h"
 #include "dtable.h"
+#include "objc_debug.h"
 
 /* Make glibc export strdup() */
 
@@ -438,6 +439,24 @@ const char * ivar_getTypeEncoding(Ivar ivar)
 	return ivar->type;
 }
 
+void object_setIvar(id object, Ivar ivar, id value)
+{
+    static int warned = 0;
+    if (warned == 0)
+    {
+        warned = 1;
+        DEBUG_LOG("Completely scary code for setting ivars directly incoming; YOU HAVE BEEN WARNED!");
+    }
+    if (object != NULL && ivar != NULL)
+    {
+    	// Uncomment this if the retain cycles are incorrect
+    	// SEL retainSel = sel_getUid("retain");
+    	// IMP retainImp = class_getInstanceMethod(object_getClass(value), retainSel);
+    	// if (retainImp != NULL)
+    	// 	value = retainImp(value, retainSel);
+        *(id **)(((void *)object) + ivar_getOffset(ivar)) = value;
+    }
+}
 
 void method_exchangeImplementations(Method m1, Method m2)
 {
