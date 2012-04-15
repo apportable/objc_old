@@ -124,7 +124,6 @@ LOCAL_SRC_FILES :=  \
                     dtable.o \
                     eh_personality.o \
                     encoding2.o \
-                    hash_table.o \
                     hooks.o \
                     ivar.o \
                     legacy_malloc.o \
