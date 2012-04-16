@@ -287,3 +287,16 @@ void _Block_release(void *src)
 		}
 	}
 }
+
+void *_Block_retain(void *src)
+{
+	struct block_literal *self = src;
+	
+	extern void _NSConcreteStackBlock;
+
+	if(self->isa == &_NSConcreteStackBlock && self->reserved > 0)
+	{
+		self->reserved++;
+	}
+	return self;
+}

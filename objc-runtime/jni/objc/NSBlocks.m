@@ -18,6 +18,14 @@ static void *_NSBlockCopy(void *src, SEL _cmd, void *zone) {
 	return _Block_copy(src);
 }
 
+static void *_NSBlockRetain(void *src, SEL _cmd) {
+	return _Block_retain(src);
+}
+
+static void _NSBlockRelease(void *src, SEL _cmd) {
+	_Block_release(src);
+}
+
 static void createNSBlockSubclass(Class superclass, Class newClass, 
 		Class metaClass, char *name)
 {
@@ -49,6 +57,8 @@ BOOL objc_create_block_classes_as_subclasses_of(Class super)
 	NEW_CLASS(super, _NSBlock);
 	NEW_CLASS(&_NSBlock, _NSConcreteStackBlock);
 	NEW_CLASS(&_NSBlock, _NSConcreteGlobalBlock);
+	class_addMethod(&_NSBlock, sel_registerName("retain"), (IMP)&_NSBlockRetain, "@@:");
+	class_addMethod(&_NSBlock, sel_registerName("release"), (IMP)&_NSBlockRelease, "v@:");
 	class_addMethod(&_NSBlock, sel_registerName("copyWithZone:"), (IMP)&_NSBlockCopy, "@@0:^{_NSZone=^?^?^?^?^?^?^?I@^{_NSZone}}");
 	return YES;
 }
