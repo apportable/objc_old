@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "class.h"
 #include "properties.h"
+#include "objc_debug.h"
 
 #ifdef __MINGW32__
 #include <windows.h>
@@ -181,4 +182,73 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 const char *property_getName(objc_property_t property)
 {
 	return property->name;
+}
+
+const char *property_getAttributes(objc_property_t property)
+{
+	/*
+	char *attrs = "";
+	if (property->attributes & OBJC_PR_noattr)
+	{
+		return "";
+	}   
+
+	if (property->attributes & OBJC_PR_readonly)
+	{
+		attrs = "readonly";
+	}  
+
+	if (property->attributes & OBJC_PR_getter)
+	{
+		if (strlen(attrs) > 0)
+			attrs = strcat(attrs, ",");
+		attrs = strcat(attrs,"getter=");
+		attrs = strcat(property->getter_name);
+	}   
+
+	if (property->attributes & OBJC_PR_assign)
+	{
+		if (strlen(attrs) > 0)
+			attrs = strcat(attrs, ",");
+		attrs = strcat(attrs,"assign");
+	}   
+
+	if (property->attributes & OBJC_PR_readwrite)
+	{
+		if (strlen(attrs) > 0)
+			attrs = strcat(attrs, ",");
+		attrs = strcat(attrs,"readwrite");
+	} 
+
+	if (property->attributes & OBJC_PR_retain)
+	{
+		if (strlen(attrs) > 0)
+			attrs = strcat(attrs, ",");
+		attrs = strcat(attrs,"retain");
+	}   
+
+	if (property->attributes & OBJC_PR_copy)
+	{
+		if (strlen(attrs) > 0)
+			attrs = strcat(attrs, ",");
+		attrs = strcat(attrs,"copy");
+	}   
+
+	if (property->attributes & OBJC_PR_nonatomic)
+	{
+		if (strlen(attrs) > 0)
+			attrs = strcat(attrs, ",");
+		attrs = strcat(attrs,"nonatomic");
+	} 
+
+	if (property->attributes & OBJC_PR_setter)
+	{
+		if (strlen(attrs) > 0)
+			attrs = strcat(attrs, ",");
+		attrs = strcat(attrs,"setter=");
+		attrs = strcat(property->setter_name);
+	}
+*/
+	DEBUG_LOG("Unimplemented property accessor");
+	return "";   
 }
