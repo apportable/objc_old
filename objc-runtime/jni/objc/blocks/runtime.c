@@ -29,8 +29,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "config.h"
-
 #ifdef HAVE_AVAILABILITY_MACROS_H
 #include <AvailabilityMacros.h>
 #endif /* HAVE_AVAILABILITY_MACROS_H */

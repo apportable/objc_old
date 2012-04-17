@@ -138,7 +138,7 @@ LOCAL_SRC_FILES :=  \
                     sync.o \
                     associations.o \
                     NSBlocks.o \
-                    bocks/runtime.o \
+                    blocks/runtime.o \
                     blocks/data.o \
 
 # libunwind stubs
