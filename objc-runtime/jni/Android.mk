@@ -115,10 +115,8 @@ endif
 
 
 LOCAL_SRC_FILES :=  \
-                    NSBlocks.o \
                     Protocol2.o \
                     abi_version.o \
-                    blocks_runtime.o \
                     caps.o \
                     category_loader.o \
                     class_table.o \
@@ -139,6 +137,9 @@ LOCAL_SRC_FILES :=  \
                     statics_loader.o \
                     sync.o \
                     associations.o \
+                    NSBlocks.o \
+                    bocks/runtime.o \
+                    blocks/data.o \
 
 # libunwind stubs
 LOCAL_SRC_FILES += unwind_stubs.o
