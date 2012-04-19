@@ -54,7 +54,7 @@ LOCAL_CFLAGS    +=  \
                     -fstack-protector \
                     -fno-short-enums \
                     -fobjc-nonfragile-abi \
-                    -fobjc-nonfragile-abi-version=1 \
+                    -fobjc-nonfragile-abi-version=2 \
                     -DHAVE_GCC_VISIBILITY \
                     -g \
                     -fpic \
