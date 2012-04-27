@@ -83,15 +83,13 @@ id objc_getProperty(id obj, SEL _cmd, int offset, BOOL isAtomic)
 		int *lock = lock_for_pointer(addr);
 		lock_spinlock(lock);
 		ret = *(id*)addr;
-		ret = [ret retain];
 		unlock_spinlock(lock);
 	}
 	else
 	{
 		ret = *(id*)addr;
-		ret = [ret retain];
 	}
-	return [ret autorelease];
+	return ret;
 }
 
 void objc_setProperty(id obj, SEL _cmd, int offset, id arg, BOOL isAtomic, BOOL isCopy)
