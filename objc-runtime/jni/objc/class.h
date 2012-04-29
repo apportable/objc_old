@@ -150,17 +150,22 @@ enum objc_class_flags
 	 * them.  The default for this is set for classes, unset for metaclasses.
 	 * It should be cleared by protocols, constant strings, and objects not
 	 * allocated by NSAllocateObject().
-	 */
+	*/
 	objc_class_flag_plane_aware = (1<<6),
+	/** 
+	 * Instances of this class are provide ARC-safe retain / release /
+	 * autorelease implementations.
+	 */
+	objc_class_flag_fast_arc = (1<<7),
 	/**
 	 * This class is a hidden class (should not be registered in the class
 	 * table nor returned from object_getClass()).
 	 */
-	objc_class_flag_hidden_class = (1<<7),
+	objc_class_flag_hidden_class = (1<<8),
 	/**
-	 * This class is a hidden class used to implement @synchronized()
+	 * This class is a hidden class used to store associated values.
 	 */
-	objc_class_flag_lock_class = (1<<8)
+	objc_class_flag_assoc_class = (1<<9)
 };
 
 static inline void objc_set_class_flag(struct objc_class *aClass,
@@ -183,4 +188,37 @@ static inline BOOL objc_test_class_flag(struct objc_class *aClass,
  * Adds a class to the class table.
  */
 void class_table_insert(Class class);
+
+/**
+ * Array of classes used for small objects.  Small objects are embedded in
+ * their pointer.  In 32-bit mode, we have one small object class (typically
+ * used for storing 31-bit signed integers.  In 64-bit mode then we can have 7,
+ * because classes are guaranteed to be word aligned. 
+ */
+extern Class SmallObjectClasses[7];
+
+static BOOL isSmallObject(id obj)
+{
+	uintptr_t addr = ((uintptr_t)obj);
+	return (addr & OBJC_SMALL_OBJECT_MASK) != 0;
+}
+
+__attribute__((always_inline))
+static inline Class classForObject(id obj)
+{
+	if (__builtin_expect(isSmallObject(obj), 0))
+	{
+		if (sizeof(Class) == 4)
+		{
+			return SmallObjectClasses[0];
+		}
+		else
+		{
+			uintptr_t addr = ((uintptr_t)obj);
+			return SmallObjectClasses[(addr & OBJC_SMALL_OBJECT_MASK)];
+		}
+	}
+	return obj->isa;
+}
+
 #endif //__OBJC_CLASS_H_INCLUDED

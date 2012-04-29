@@ -5,7 +5,11 @@
 #	define __GNUSTEP_RUNTIME__
 #endif
 
-
+#if defined(__has_feature) && __has_feature(objc_arc)
+#define UNSAFE_UNRETAINED __unsafe_unretained
+#else
+#define UNSAFE_UNRETAINED
+#endif
 
 #include <stdint.h>
 #include <stddef.h>
@@ -54,7 +58,11 @@ typedef struct objc_object
 
 struct objc_super
 {
+#if defined(__has_feature) && __has_feature(objc_arc)
+	void *receiver;
+#else
 	id receiver;
+#endif
 #	if !defined(__cplusplus)  &&  !__OBJC2__
 	Class class;
 #	else
@@ -149,7 +157,7 @@ Method * class_copyMethodList(Class cls, unsigned int *outCount);
 
 objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount);
 
-Protocol ** class_copyProtocolList(Class cls, unsigned int *outCount);
+Protocol * UNSAFE_UNRETAINED * class_copyProtocolList(Class cls, unsigned int *outCount);
 
 id class_createInstance(Class cls, size_t extraBytes);
 
@@ -270,7 +278,7 @@ struct objc_method_description *protocol_copyMethodDescriptionList(Protocol *p,
 
 objc_property_t *protocol_copyPropertyList(Protocol *p, unsigned int *count);
 
-Protocol **protocol_copyProtocolList(Protocol *p, unsigned int *count);
+Protocol * UNSAFE_UNRETAINED * protocol_copyProtocolList(Protocol *p, unsigned int *count);
 
 struct objc_method_description protocol_getMethodDescription(Protocol *p,
 	SEL aSel, BOOL isRequiredMethod, BOOL isInstanceMethod);
@@ -474,5 +482,30 @@ extern void track_deallocation(Class aClass);
 #define _C_OUT      'o'
 #define _C_BYCOPY   'O'
 #define _C_ONEWAY   'V'
+
+
+/**
+ * The mask identifying the bits that can be used in an object pointer to
+ * identify a small object.  On 32-bit systems, we use the low bit.  On 64-bit
+ * systems, we use the low 3 bits.  In both cases, the lowest bit must be 1.
+ * This restriction may be relaxed in the future on 64-bit systems.
+ */
+#ifndef UINTPTR_MAX
+#	define OBJC_SMALL_OBJECT_MASK ((sizeof(void*) == 4) ? 1 : 7)
+#elif UINTPTR_MAX < UINT64_MAX
+#	define OBJC_SMALL_OBJECT_MASK 1
+#else
+#	define OBJC_SMALL_OBJECT_MASK 7
+#endif
+/**
+ * The number of bits reserved for the class identifier in a small object.
+ */
+#ifndef UINTPTR_MAX
+#	define OBJC_SMALL_OBJECT_SHIFT ((sizeof(void*) == 4) ? 1 : 3)
+#elif UINTPTR_MAX < UINT64_MAX
+#	define OBJC_SMALL_OBJECT_SHIFT 1
+#else
+#	define OBJC_SMALL_OBJECT_SHIFT 3
+#endif
 
 #endif // __LIBOBJC_RUNTIME_H_INCLUDED__

@@ -60,15 +60,13 @@ BOOL objc_check_abi_version(unsigned long version, unsigned long module_size)
 			break;
 		}
 	}
-	FAIL_IF(NULL == v, "Unknown ABI version");
-	FAIL_IF((v->module_size != module_size), "Incorrect module size");
+	// FAIL_IF(NULL == v, "Unknown ABI version");
+	// FAIL_IF((v->module_size != module_size), "Incorrect module size");
 	// Only check for ABI compatibility if 
 	if (min_loaded_version > 0)
 	{
-		FAIL_IF((v->min_compatible_version > min_loaded_version),
-				"Loading modules from incompatible ABIs");
-		FAIL_IF((v->max_compatible_version < max_loaded_version),
-				"Loading modules from incompatible ABIs");
+		// FAIL_IF((v->min_compatible_version > min_loaded_version), "Loading modules from incompatible ABIs");
+		// FAIL_IF((v->max_compatible_version < max_loaded_version), "Loading modules from incompatible ABIs");
 		if (min_loaded_version > version)
 		{
 			min_loaded_version = version;
