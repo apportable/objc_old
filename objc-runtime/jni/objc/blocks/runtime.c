@@ -28,6 +28,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "../objc_debug.h"
 
 #ifdef HAVE_AVAILABILITY_MACROS_H
 #include <AvailabilityMacros.h>
@@ -435,7 +436,6 @@ static void _Block_byref_release(const void *arg) {
     }
     refcount = shared_struct->flags & BLOCK_REFCOUNT_MASK;
     if (refcount <= 0) {
-        printf("_Block_byref_release: Block byref data structure at %p underflowed\n", arg);
     }
     else if ((latching_decr_int(&shared_struct->flags) & BLOCK_REFCOUNT_MASK) == 0) {
         //printf("disposing of heap based byref block\n");
@@ -466,6 +466,7 @@ void *_Block_copy(const void *arg) {
 
 // API entry point to release a copied Block
 void _Block_release(void *arg) {
+    DEBUG_LOG("Releasing block");
     struct Block_layout *aBlock = (struct Block_layout *)arg;
     int32_t newCount;
     if (!aBlock) return;
@@ -486,8 +487,14 @@ void _Block_release(void *arg) {
         ;
     }
     else {
-        printf("Block_release called upon a stack Block: %p, ignored\n", (void *)aBlock);
+        DEBUG_LOG("Block_release called upon a stack Block: %p, ignored", (void *)aBlock);
     }
+}
+
+void *_Block_retain(void *arg) {
+    struct Block_layout *aBlock = (struct Block_layout *)arg;
+    latching_incr_int(&aBlock->flags) & BLOCK_REFCOUNT_MASK;
+    return aBlock;
 }
 
 

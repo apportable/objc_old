@@ -30,7 +30,7 @@ static void _NSBlockRelease(void *src, SEL _cmd) {
 }
 
 static void *_NSBlockRetain(void *src, SEL _cmd) {
-	return src;
+	return _Block_retain(src);
 }
 
 static void createNSBlockSubclass(Class superclass, Class newClass, 
