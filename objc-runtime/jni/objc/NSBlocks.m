@@ -33,6 +33,36 @@ static void *_NSBlockRetain(void *src, SEL _cmd) {
 	return _Block_copy(src);
 }
 
+static id _NSBlockDescription(void *src, SEL _cmd) {
+	
+	const char *description = _Block_dump(src);
+	// return [[[NSString alloc] initWithUTF8String:description] autorelease];
+	static Class NSStringClass = NULL;
+	static IMP NSStringAlloc = NULL;
+	static IMP NSStringInitWithUTF8String = NULL;
+	static IMP NSStringAutorelease = NULL;
+	if (NSStringClass == NULL)
+	{
+		NSStringClass = objc_getClass("NSString");
+	}
+	if (NSStringAlloc == NULL)
+	{
+		Method m = class_getClassMethod(NSStringClass, sel_registerName("allocWithZone:"));
+		NSStringAlloc = method_getImplementation(m);
+	}
+	if (NSStringInitWithUTF8String == NULL)
+	{
+		Method m = class_getInstanceMethod(NSStringClass, sel_registerName("initWithUTF8String:"));
+		NSStringInitWithUTF8String = method_getImplementation(m);
+	}
+	if (NSStringAutorelease == NULL)
+	{
+		Method m = class_getInstanceMethod(NSStringClass, sel_registerName("autorelease"));
+		NSStringAutorelease = method_getImplementation(m);
+	}
+	return NSStringAutorelease(NSStringInitWithUTF8String(NSStringAlloc(NSStringClass, sel_getUid("allocWithZone:"), NULL), sel_getUid("initWithUTF8String:"), description), sel_getUid("autorelease"));
+}
+
 static void createNSBlockSubclass(Class superclass, Class newClass, 
 		Class metaClass, char *name)
 {
@@ -63,7 +93,7 @@ BOOL objc_create_block_classes_as_subclasses_of(Class super)
 	class_addMethod(_NSBlock, sel_registerName("retain"), (IMP)&_NSBlockRetain, "@@:");
 	class_addMethod(_NSBlock, sel_registerName("copy"), (IMP)&_NSBlockCopyNoZone, "@@:");
 	class_addMethod(_NSBlock, sel_registerName("copyWithZone:"), (IMP)&_NSBlockCopy, "@@0:^{_NSZone=^?^?^?^?^?^?^?I@^{_NSZone}}");
-
+	class_addMethod(_NSBlock, sel_registerName("description"), (IMP)&_NSBlockDescription, "@@:");
 	NEW_CLASS(_NSBlock, _NSConcreteStackBlock);
 	NEW_CLASS(_NSBlock, _NSConcreteMallocBlock);
 	NEW_CLASS(_NSBlock, _NSConcreteAutoBlock);
