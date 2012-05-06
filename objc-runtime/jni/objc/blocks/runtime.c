@@ -466,7 +466,6 @@ void *_Block_copy(const void *arg) {
 
 // API entry point to release a copied Block
 void _Block_release(void *arg) {
-    DEBUG_LOG("Releasing block");
     struct Block_layout *aBlock = (struct Block_layout *)arg;
     int32_t newCount;
     if (!aBlock) return;
