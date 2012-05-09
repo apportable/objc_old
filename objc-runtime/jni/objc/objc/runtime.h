@@ -254,17 +254,34 @@ Protocol *objc_getProtocol(const char *name);
 
 void objc_registerClassPair(Class cls);
 
-void *object_getIndexedIvars(id obj);
+#pragma mark Working with instances
 
-// FIXME: The GNU runtime has a version of this which omits the size parameter
-//id object_copy(id obj, size_t size);
+void *object_getIndexedIvars(id obj);
 
 id object_dispose(id obj);
 
 Class object_getClass(id obj);
+
 Class object_setClass(id obj, Class cls);
 
 const char *object_getClassName(id obj);
+
+id object_copy(id obj, size_t size);
+
+Class object_getClass(id obj);
+
+Class object_setClass(id obj, Class cls);
+
+const char *object_getClassName(id obj);
+
+id object_getIvar(id obj, Ivar ivar);
+
+void object_setIvar(id obj, Ivar ivar, id value);
+
+Ivar object_setInstanceVariable(id obj, const char *name, void *value);
+
+Ivar object_getInstanceVariable(id obj, const char *name, void **outValue);
+
 
 IMP objc_msg_lookup(id, SEL) OBJC_NONPORTABLE;
 IMP objc_msg_lookup_super(struct objc_super*, SEL) OBJC_NONPORTABLE;
