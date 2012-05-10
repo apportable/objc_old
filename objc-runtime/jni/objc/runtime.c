@@ -439,6 +439,13 @@ const char * ivar_getTypeEncoding(Ivar ivar)
 	return ivar->type;
 }
 
+id object_getIvar(id object, Ivar ivar) {
+    if(NULL == object || NULL == ivar)
+        return NULL;
+    
+    return *(id **)(((void *)object) + ivar_getOffset(ivar));
+}
+
 void object_setIvar(id object, Ivar ivar, id value)
 {
     static int warned = 0;
