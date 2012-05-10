@@ -184,6 +184,15 @@ const char *property_getName(objc_property_t property)
 
 const char *property_getAttributes(objc_property_t property)
 {
+	// Format of property attributes on iOS
+
+	// T for type name, Example: T@"NSString"
+	// & for retain
+	// N for nonatomic
+	// G for getter, Example: Gval
+	// S for setter, Example: SsetVal:
+	// V for backing iVar, Example: V_val
+
 	/*
 	char *attrs = "";
 	if (property->attributes & OBJC_PR_noattr)

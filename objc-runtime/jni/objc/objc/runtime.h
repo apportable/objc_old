@@ -287,6 +287,7 @@ IMP objc_msg_lookup(id, SEL) OBJC_NONPORTABLE;
 IMP objc_msg_lookup_super(struct objc_super*, SEL) OBJC_NONPORTABLE;
 
 const char *property_getName(objc_property_t property);
+const char *property_getAttributes(objc_property_t property);
 
 BOOL protocol_conformsToProtocol(Protocol *p, Protocol *other);
 
