@@ -2,15 +2,20 @@ LOCAL_PATH := $(call my-dir)
 
 # Build Objective-C Runtime
 include $(CLEAR_VARS)
-TARGET_ARCH_ABI       ?= armeabi-7a
+TARGET_ARCH_ABI  ?= armeabi-7a
 BUILD            ?= release
 TARGET_OS        := android
 HOST_OS          ?= Darwin
 FRONTEND         ?= clang
 CLANG_VERSION    ?= 3.1
-ROOTDIR          := $(LOCAL_PATH)
+ROOTDIR          ?= $(LOCAL_PATH)
 MODULE           := objc
-BINDIR           := $(abspath $(ROOTDIR)/../obj/local/$(TARGET_ARCH_ABI)/objs/ )
+MODULE_DST       := obj/local/$(TARGET_ARCH_ABI)/objs/objc
+ifeq ("$(BINDIR)","")
+    BINDIR       := $(abspath $(ROOTDIR)/../obj/local/$(TARGET_ARCH_ABI)/objs/ )
+else
+    BINDIR       := $(abspath $(BINDIR) )
+endif
 ANDROID_NDK_ROOT :=/Developer/DestinyCloudFist/crystax-ndk-r7
 ANDROID_SDK_ROOT :=/Developer/DestinyCloudFist/android-sdk-mac_x86
 TRACK_OBJC_ALLOCATIONS ?= no
@@ -174,7 +179,7 @@ else
   
 endif
 
-OBJDIR = $(BINDIR)/$(MODULE)
+OBJDIR = $(BINDIR)/$(MODULE_DST)
 # OUTPUT_OBJECTS = ${OBJECTS:%=$(OBJDIR)/%}
 
 MODULE_CFLAGS := $(COMMON_CFLAGS) $(CFLAGS) $(LOCAL_CFLAGS) 
