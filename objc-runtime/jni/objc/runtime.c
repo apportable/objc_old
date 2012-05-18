@@ -261,6 +261,7 @@ class_copyProtocolList(Class cls, unsigned int *outCount)
   return protocols;
 }
 
+// If you are calling this, do not. You are welcome.
 id class_createInstance(Class cls, size_t extraBytes)
 {
 	if (Nil == cls)	{ return nil; }

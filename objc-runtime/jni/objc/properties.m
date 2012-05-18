@@ -119,7 +119,10 @@ void objc_setProperty(id obj, SEL _cmd, int offset, id arg, BOOL isAtomic, BOOL 
 		old = *(id*)addr;
 		*(id*)addr = arg;
 	}
-	[old release];
+	if(old != NULL && old->isa != NULL && old->isa != 0xdeadface)
+		[old release];
+	else
+		DEBUG_LOG("WTF! old is baaaaaaaaad");
 }
 
 objc_property_t class_getProperty(Class cls, const char *name)

@@ -351,7 +351,7 @@ extern struct objc_slot *objc_msg_lookup_sender(id *receiver, SEL selector, id s
 
 // Global self so that self is a valid symbol everywhere.  Will be replaced by
 // a real self in an inner scope if there is one.
-static const id self = nil;
+// static const id self = nil; BAD NO WRONG!!! 
 // This uses a GCC extension, but the is no good way of doing it otherwise.
 #define objc_msgSend(theReceiver, theSelector, ...) \
 ({\
