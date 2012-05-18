@@ -171,7 +171,7 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 	{
 		for (int i=0 ; i<properties->count ; i++)
 		{
-			list[out] = &l->properties[i];
+			list[out++] = &l->properties[i];
 		}
 	}
 	return list;
