@@ -86,19 +86,24 @@ static void createNSBlockSubclass(Class superclass, Class newClass,
 
 BOOL objc_create_block_classes_as_subclasses_of(Class super)
 {
-	DEBUG_LOG("Initialize block classes!");
+	static BOOL initialized = NO;
+	if (!initialized)
+	{
+		initialized = YES;
+		DEBUG_LOG("Initialize block classes!");
 
-	NEW_CLASS(super, _NSBlock);
-	class_addMethod(_NSBlock, sel_registerName("release"), (IMP)&_NSBlockRelease, "v@:");
-	class_addMethod(_NSBlock, sel_registerName("retain"), (IMP)&_NSBlockRetain, "@@:");
-	class_addMethod(_NSBlock, sel_registerName("copy"), (IMP)&_NSBlockCopyNoZone, "@@:");
-	class_addMethod(_NSBlock, sel_registerName("copyWithZone:"), (IMP)&_NSBlockCopy, "@@0:^{_NSZone=^?^?^?^?^?^?^?I@^{_NSZone}}");
-	class_addMethod(_NSBlock, sel_registerName("description"), (IMP)&_NSBlockDescription, "@@:");
-	NEW_CLASS(_NSBlock, _NSConcreteStackBlock);
-	NEW_CLASS(_NSBlock, _NSConcreteMallocBlock);
-	NEW_CLASS(_NSBlock, _NSConcreteAutoBlock);
-	NEW_CLASS(_NSBlock, _NSConcreteFinalizingBlock);
-	NEW_CLASS(_NSBlock, _NSConcreteGlobalBlock);
+		NEW_CLASS(super, _NSBlock);
+		class_addMethod(_NSBlock, sel_registerName("release"), (IMP)&_NSBlockRelease, "v@:");
+		class_addMethod(_NSBlock, sel_registerName("retain"), (IMP)&_NSBlockRetain, "@@:");
+		class_addMethod(_NSBlock, sel_registerName("copy"), (IMP)&_NSBlockCopyNoZone, "@@:");
+		class_addMethod(_NSBlock, sel_registerName("copyWithZone:"), (IMP)&_NSBlockCopy, "@@0:^{_NSZone=^?^?^?^?^?^?^?I@^{_NSZone}}");
+		class_addMethod(_NSBlock, sel_registerName("description"), (IMP)&_NSBlockDescription, "@@:");
+		NEW_CLASS(_NSBlock, _NSConcreteStackBlock);
+		NEW_CLASS(_NSBlock, _NSConcreteMallocBlock);
+		NEW_CLASS(_NSBlock, _NSConcreteAutoBlock);
+		NEW_CLASS(_NSBlock, _NSConcreteFinalizingBlock);
+		NEW_CLASS(_NSBlock, _NSConcreteGlobalBlock);
+	}
 
 	return YES;
 }
