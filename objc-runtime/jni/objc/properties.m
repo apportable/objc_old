@@ -136,13 +136,18 @@ objc_property_t class_getProperty(Class cls, const char *name)
 		for (int i=0 ; i<properties->count ; i++)
 		{
 			objc_property_t p = &properties->properties[i];
-			if (strcmp(p->name, name) == 0)
+			if (strcmp(property_getName(p), name) == 0)
 			{
 				return p;
 			}
 		}
 		properties = properties->next;
 	}
+
+	if(cls->super_class != NULL) {
+		return class_getProperty(cls->super_class, name);
+	}
+
 	return NULL;
 }
 objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
@@ -180,7 +185,13 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 
 const char *property_getName(objc_property_t property)
 {
-	return property->name;
+	if(property == NULL) {
+		DEBUG_LOG("Property name requested on null property");
+		return "";
+	}
+
+    char *c = strchr(property->name, '|');
+	return strndup(property->name, c - property->name);
 }
 
 const char *property_getAttributes(objc_property_t property)
@@ -194,69 +205,32 @@ const char *property_getAttributes(objc_property_t property)
 	// S for setter, Example: SsetVal:
 	// V for backing iVar, Example: V_val
 
-	/*
-	char *attrs = "";
-	if (property->attributes & OBJC_PR_noattr)
-	{
-		return "";
-	}   
+	char *attrs = calloc(256, 1);
+	
+	// Add type information
+	attrs = strcat(attrs, "T");
+	char *first = strchr(property->name, '|');
+	attrs = strncat(attrs, first + 1, strrchr(property->name, '|') - first - 1);
 
-	if (property->attributes & OBJC_PR_readonly)
-	{
-		attrs = "readonly";
-	}  
-
-	if (property->attributes & OBJC_PR_getter)
-	{
-		if (strlen(attrs) > 0)
-			attrs = strcat(attrs, ",");
-		attrs = strcat(attrs,"getter=");
-		attrs = strcat(property->getter_name);
-	}   
-
-	if (property->attributes & OBJC_PR_assign)
-	{
-		if (strlen(attrs) > 0)
-			attrs = strcat(attrs, ",");
-		attrs = strcat(attrs,"assign");
-	}   
-
-	if (property->attributes & OBJC_PR_readwrite)
-	{
-		if (strlen(attrs) > 0)
-			attrs = strcat(attrs, ",");
-		attrs = strcat(attrs,"readwrite");
-	} 
-
-	if (property->attributes & OBJC_PR_retain)
-	{
-		if (strlen(attrs) > 0)
-			attrs = strcat(attrs, ",");
-		attrs = strcat(attrs,"retain");
-	}   
-
-	if (property->attributes & OBJC_PR_copy)
-	{
-		if (strlen(attrs) > 0)
-			attrs = strcat(attrs, ",");
-		attrs = strcat(attrs,"copy");
-	}   
+	// & for retain
+	if (!(property->attributes & OBJC_PR_assign))
+		attrs = strcat(attrs, ",&");
 
 	if (property->attributes & OBJC_PR_nonatomic)
-	{
-		if (strlen(attrs) > 0)
-			attrs = strcat(attrs, ",");
-		attrs = strcat(attrs,"nonatomic");
-	} 
+		attrs = strcat(attrs, ",N");
 
-	if (property->attributes & OBJC_PR_setter)
-	{
-		if (strlen(attrs) > 0)
-			attrs = strcat(attrs, ",");
-		attrs = strcat(attrs,"setter=");
-		attrs = strcat(property->setter_name);
+	if (property->attributes & OBJC_PR_getter) {
+		attrs = strcat(attrs, ",G");
+		attrs = strcat(attrs, property->getter_name);
 	}
-*/
-	DEBUG_LOG("Unimplemented property accessor");
-	return "";   
+
+	if(property->attributes & OBJC_PR_setter) {
+		attrs = strcat(attrs, ",S");
+		attrs = strcat(attrs, property->setter_name);
+	}
+
+	attrs = strcat(attrs, ",V");
+	attrs = strcat(attrs, strrchr(property->name, '|') + 1);
+
+	return attrs;
 }
