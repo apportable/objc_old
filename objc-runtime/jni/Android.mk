@@ -187,48 +187,49 @@ MODULE_CCFLAGS := $(COMMON_CCFLAGS) $(CCFLAGS) $(LOCAL_CFLAGS)
 MODULE_ASFLAGS := $(COMMON_ASFLAGS) $(ASFLAGS) $(LOCAL_ASFLAGS) 
 MODULE_OBJCFLAGS := $(COMMON_OBJCFLAGS) $(LOCAL_OBJCFLAGS)
 
-$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.cc
-	@echo ".cc" $<
-	@mkdir -p `echo $@ | sed s/[^/]*[.]o$$//`
-	$(CC) $(MODULE_CCFLAGS) -S $< -o $@.s
-	perl fixup_assembly.pl < $@.s > $@.fixed.s
-	$(CCAS) $(MODULE_ASFLAGS) -c $@.fixed.s -o $@
+# pull in dependency info for *existing* .o files
+-include $(subst .o,.out.d,$(shell find $(OBJDIR) -name "*.o" ))
 
-$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.cpp
-	@echo ".cpp" $<
-	@mkdir -p `echo $@ | sed s/[^/]*[.]o$$//`
-	$(CC) $(MODULE_CCFLAGS) -S $< -o $@.s
-	perl fixup_assembly.pl < $@.s > $@.fixed.s
-	$(CCAS) $(MODULE_ASFLAGS) -c $@.fixed.s -o $@
+.SECONDARY: ;
 
-$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.c
-	@echo ".c" $<
-	@mkdir -p `echo $@ | sed s/[^/]*[.]o$$//`
-	$(CC) $(MODULE_CFLAGS) $(MODULE_CCFLAGS) -S $< -o $@.s
-	perl fixup_assembly.pl < $@.s > $@.fixed.s
-	$(CCAS) $(MODULE_ASFLAGS) -c $@.fixed.s -o $@
+$(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.mm .SECONDARY
+	@echo Compiling .mm $<
+	@mkdir -p $(dir $@)
+	@$(CC) -MD -MT $@ $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
-$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.m
-	@echo ".m" $<
-	@mkdir -p `echo $@ | sed s/[^/]*[.]o$$//`
-	$(CC) $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) -S $< -o $@.s
-	perl fixup_assembly.pl < $@.s > $@.fixed.s
-	$(CCAS) $(MODULE_ASFLAGS) -c $@.fixed.s -o $@
+$(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.cc .SECONDARY
+	@echo Compiling .cc $<
+	@mkdir -p $(dir $@)
+	@$(CC) -MD -MT $@ -x objective-c++ -fblocks $(MODULE_CCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
-$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.mm
-	@echo ".mm" $<
-	@mkdir -p `echo $@ | sed s/[^/]*[.]o$$//`
-	@echo $(CC) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) -S $< -o $@.s
-	$(CC) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) -S $< -o $@.s
-	perl fixup_assembly.pl < $@.s > $@.fixed.s
-	$(CCAS) $(MODULE_ASFLAGS) -c $@.fixed.s -o $@
+$(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.cpp .SECONDARY
+	@echo Compiling .cpp $<
+	@mkdir -p $(dir $@)
+	@$(CC) -MD -MT $@ -x objective-c++ -fblocks $(MODULE_CCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
+
+$(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.c .SECONDARY
+	@echo Compiling .c $<
+	mkdir -p $(dir $@)
+	$(CC) -MD -MT $@ $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
+
+$(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.m .SECONDARY
+	@echo Compiling .m $<
+	mkdir -p $(dir $@)
+	$(CC) -MD -MT $@ $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
+
+$(OBJDIR)/%.fixed.s: $(OBJDIR)/%.out.s .SECONDARY
+	@echo fixing $<
+	@perl fixup_assembly.pl < $< > $@
+
+$(OBJDIR)/%.o: $(OBJDIR)/%.fixed.s
+	@echo assembling $<
+	@$(CCAS) $(MODULE_ASFLAGS) -c $< -o $@
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.s
-	@echo $<
-	@mkdir -p `echo $@ | sed s/[^/]*[.]o$$//`
-	$(CC) $(MODULE_ASFLAGS) -c $< -o $@
+	@echo Assembling $<
+	mkdir -p $(dir $@)
+	@$(CC) $(MODULE_ASFLAGS) -c $< -o $@
 
-# $(MODULE): $(OUTPUT_OBJECTS)
 
 include $(BUILD_SHARED_LIBRARY)
 
