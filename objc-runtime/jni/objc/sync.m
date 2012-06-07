@@ -64,7 +64,12 @@ static inline const char *sync_error(int err)
 	}
 }
 
-#define require_noerr_string(err, label, msg) if (err != 0) { DEBUG_LOG("%s err = %s", msg, sync_error(err)); goto label; }
+void objc_sync_err()
+{
+    // BAD RUNTIME! NO TREAT FOR YOU!;
+}
+
+#define require_noerr_string(err, label, msg) if (err != 0) { DEBUG_LOG("%s err = %s; set a breakpoint on objc_sync_err to debug", msg, sync_error(err)); objc_sync_err(); goto label; }
 #define require_action_string(action, label, result, msg) if(!(action)) { result; DEBUG_LOG("%s", msg); goto label; }
 
 //
