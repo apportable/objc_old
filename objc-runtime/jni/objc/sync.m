@@ -64,7 +64,12 @@ static inline const char *sync_error(int err)
 	}
 }
 
-#define require_noerr_string(err, label, msg) if (err != 0) { DEBUG_LOG("%s err = %s", msg, sync_error(err)); goto label; }
+void objc_sync_err()
+{
+    // BAD RUNTIME! NO TREAT FOR YOU!;
+}
+
+#define require_noerr_string(err, label, msg) if (err != 0) { DEBUG_LOG("%s err = %s; set a breakpoint on objc_sync_err to debug", msg, sync_error(err)); objc_sync_err(); goto label; }
 #define require_action_string(action, label, result, msg) if(!(action)) { result; DEBUG_LOG("%s", msg); goto label; }
 
 //
@@ -120,20 +125,24 @@ static SyncData* id2data(id object)
     
     SyncData* firstUnused = NULL;
     SyncData* p;
-    for (p = sDataList; p != NULL; p = p->nextData) {
-        if ( p->object == object ) {
+    for (p = sDataList; p != NULL; p = p->nextData) 
+    {
+        if ( p->object == object ) 
+        {
             result = p;
             goto done;
         }
         if ( (firstUnused == NULL) && (p->object == NULL) )
+        {
             firstUnused = p;
+        }
     }
     
     // if no corresponding SyncData found, but an unused one was found, use it
     if ( firstUnused != NULL ) {
         result = firstUnused;
         result->object = object;
-        result->lockCount = 0;	// sanity
+        result->lockCount = 0;  // sanity
         goto done;
     }
                             
@@ -174,16 +183,27 @@ done:
     pthread_mutex_unlock(&sTableLock);
 }
 
+void objc_sync_nil() 
+{
+    // BAD PROGRAMMER! NO TREAT FOR YOU!;
+}
+
 // Begin synchronizing on 'obj'.  
 // Allocates recursive pthread_mutex associated with 'obj' if needed.
 // Returns OBJC_SYNC_SUCCESS once lock is acquired.  
 int objc_sync_enter(id obj)
 {
+    if (obj == NULL)
+    {
+        DEBUG_LOG("NIL SYNC DEBUG: @synchronized(nil); set a breakpoint on objc_sync_nil to debug");
+        objc_sync_nil();
+        return OBJC_SYNC_SUCCESS;
+    }
     int result = OBJC_SYNC_SUCCESS;
     
     SyncData* data = id2data(obj);
     require_action_string(data != NULL, done, result = OBJC_SYNC_NOT_INITIALIZED, "id2data failed");
-	
+    
     result = pthread_mutex_lock(&data->mutex);
     require_noerr_string(result, done, "pthread_mutex_lock failed");
 	data->thread = pthread_self();
@@ -198,6 +218,13 @@ done:
 // Returns OBJC_SYNC_SUCCESS or OBJC_SYNC_NOT_OWNING_THREAD_ERROR
 int objc_sync_exit(id obj)
 {
+    if (obj == NULL)
+    {
+        DEBUG_LOG("NIL SYNC DEBUG: @synchronized(nil); set a breakpoint on objc_sync_nil to debug");
+        objc_sync_nil();
+        return OBJC_SYNC_SUCCESS;
+    }
+
     int result = OBJC_SYNC_SUCCESS;
     
     SyncData* data;
