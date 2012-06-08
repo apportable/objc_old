@@ -144,7 +144,8 @@ static SyncData* id2data(id object)
         result = firstUnused;
         result->object = object;
         result->lockCount = 0;  // sanity
-        goto done;
+        pthread_mutex_unlock(&sTableLock);
+        return result;
     }
                             
     // malloc a new SyncData and add to list.
