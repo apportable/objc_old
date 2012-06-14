@@ -51,8 +51,7 @@ static struct objc_slot* objc_selector_type_mismatch(Class cls, SEL
 struct objc_slot* (*_objc_selector_type_mismatch)(Class cls, SEL
 		selector, struct objc_slot *result) = objc_selector_type_mismatch;
 static 
-// Uncomment for debugging
-//__attribute__((noinline))
+
 __attribute__((always_inline))
 Slot_t objc_msg_lookup_internal(id *receiver,
                                 SEL selector, 
@@ -117,6 +116,7 @@ Slot_t (*objc_plane_lookup)(id *receiver, SEL op, id sender) =
  * New Objective-C lookup function.  This permits the lookup to modify the
  * receiver and also supports multi-dimensional dispatch based on the sender.  
  */
+__attribute__((always_inline))
 Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 {
 	//fprintf(stderr, "Looking up slot %s\n", sel_get_name(selector));
