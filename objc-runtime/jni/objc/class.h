@@ -179,6 +179,8 @@ static inline void objc_clear_class_flag(struct objc_class *aClass,
 	aClass->info &= ~(unsigned long)flag;
 }
 static inline BOOL objc_test_class_flag(struct objc_class *aClass,
+                                        enum objc_class_flags flag) __attribute__((no_instrument_function));
+static inline BOOL objc_test_class_flag(struct objc_class *aClass,
                                         enum objc_class_flags flag)
 {
 	return (aClass->info & (unsigned long)flag) == (unsigned long)flag;
@@ -197,13 +199,15 @@ void class_table_insert(Class class);
  */
 extern Class SmallObjectClasses[7];
 
+static BOOL isSmallObject(id obj) __attribute__((no_instrument_function));
+
 static BOOL isSmallObject(id obj)
 {
 	uintptr_t addr = ((uintptr_t)obj);
 	return (addr & OBJC_SMALL_OBJECT_MASK) != 0;
 }
 
-__attribute__((always_inline))
+__attribute__((always_inline, no_instrument_function))
 static inline Class classForObject(id obj)
 {
 	if (__builtin_expect(isSmallObject(obj), 0))
