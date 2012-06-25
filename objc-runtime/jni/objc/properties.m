@@ -7,6 +7,7 @@
 #include "properties.h"
 #include "objc_debug.h"
 #include "uthash.h"
+#include <pthread.h>
 
 // Since the compiler now returns extra information in
 // the name and attribute labels
@@ -20,7 +21,7 @@ struct objc_property_extra {
 static struct objc_property_extra* prop_extras = NULL;
 
 
-typedef void *objcRefLock;
+typedef pthread_mutex_t objcRefLock;
 objcRefLock _objcPropertyLock;
 
 extern int (*_objcRefRLock)(objcRefLock *lock);

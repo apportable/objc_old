@@ -9,7 +9,7 @@
 #include <pthread.h>
 #include <unistd.h>
  
-typedef void *objcRefLock;
+typedef pthread_mutex_t objcRefLock;
 objcRefLock _objcReferenceLock;
 
 int (*_objcRefRLock)(objcRefLock *lock) = NULL;
@@ -194,8 +194,8 @@ void objc_setAssociatedObject(id object, const void *key, id value, objc_Associa
  
 id objc_getAssociatedObject(id object, const void *key)
 {
-	HASH_RLOCK();
-	initializeSelectors();
+    HASH_RLOCK();
+    initializeSelectors();
     objc_associations *object_entry = NULL;
     HASH_FIND_PTR(associations, &object, object_entry);
     if (object_entry != NULL) {
