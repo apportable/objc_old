@@ -269,26 +269,22 @@ const char *property_getName(objc_property_t property)
 	}
 
 	struct objc_property_extra* entry = NULL;
-	HASH_WLOCK();
 	HASH_FIND_PTR(prop_extras, &property, entry);
 	if (entry == NULL) {
 		entry = property_createExtras(property);
     	HASH_ADD_PTR(prop_extras, property, entry);
 	}
-	HASH_WUNLOCK();
 	return entry->name;
 }
 
 const char *property_getAttributes(objc_property_t property)
 {
 	struct objc_property_extra* entry = NULL;
-	HASH_WLOCK();
 	HASH_FIND_PTR(prop_extras, &property, entry);
 	if (entry == NULL) {
 		entry = property_createExtras(property);
     	HASH_ADD_PTR(prop_extras, property, entry);
 	}
-	HASH_WUNLOCK();
 	return entry->attributes;
 }
 
