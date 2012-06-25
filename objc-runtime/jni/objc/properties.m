@@ -6,6 +6,33 @@
 #include "class.h"
 #include "properties.h"
 #include "objc_debug.h"
+#include "uthash.h"
+
+// Since the compiler now returns extra information in
+// the name and attribute labels
+struct objc_property_extra {
+    objc_property_t property;
+    char *name;
+    char *attributes;
+    UT_hash_handle hh;
+};
+
+static struct objc_property_extra* prop_extras = NULL;
+
+
+typedef void *objcRefLock;
+objcRefLock _objcPropertyLock;
+
+extern int (*_objcRefRLock)(objcRefLock *lock);
+extern int (*_objcRefRUnlock)(objcRefLock *lock);
+extern int (*_objcRefWLock)(objcRefLock *lock);
+extern int (*_objcRefWUnlock)(objcRefLock *lock);
+extern int (*_objcRefLockFatal)(const char *err);
+
+#define HASH_RLOCK() if (_objcRefRLock != NULL && _objcRefLockFatal != NULL && _objcRefRLock(&_objcPropertyLock) != 0) _objcRefLockFatal("can't get rdlock")
+#define HASH_RUNLOCK() if (_objcRefRUnlock != NULL) _objcRefRUnlock(&_objcPropertyLock)
+#define HASH_WLOCK() if (_objcRefWLock != NULL && _objcRefLockFatal != NULL && _objcRefWLock(&_objcPropertyLock) != 0) _objcRefLockFatal("can't get wrlock")
+#define HASH_WUNLOCK() if (_objcRefWUnlock != NULL) _objcRefWUnlock(&_objcPropertyLock)
 
 #ifdef __MINGW32__
 #include <windows.h>
@@ -182,20 +209,16 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 	}
 	return list;
 }
+struct objc_property_extra *property_createExtras(objc_property_t property) {
 
-const char *property_getName(objc_property_t property)
-{
-	if(property == NULL) {
-		DEBUG_LOG("Property name requested on null property");
-		return "";
-	}
+	struct objc_property_extra *entry = (struct objc_property_extra *)malloc(sizeof(struct objc_property_extra));
+	entry->property = property;
 
-    char *c = strchr(property->name, '|');
-	return strndup(property->name, c - property->name);
-}
+	// 1. Create the name
+	char *c = strchr(property->name, '|');
+	entry->name = strndup(property->name, c - property->name);
 
-const char *property_getAttributes(objc_property_t property)
-{
+	// 2. Create the attr string
 	// Format of property attributes on iOS
 
 	// T for type name, Example: T@"NSString"
@@ -231,6 +254,56 @@ const char *property_getAttributes(objc_property_t property)
 
 	attrs = strcat(attrs, ",V");
 	attrs = strcat(attrs, strrchr(property->name, '|') + 1);
+	entry->attributes = attrs;
 
-	return attrs;
+	return entry;
+}
+
+
+
+const char *property_getName(objc_property_t property)
+{
+	if(property == NULL) {
+		DEBUG_LOG("Property name requested on null property");
+		return "";
+	}
+
+	struct objc_property_extra* entry = NULL;
+	HASH_WLOCK();
+	HASH_FIND_PTR(prop_extras, &property, entry);
+	if (entry == NULL) {
+		entry = property_createExtras(property);
+    	HASH_ADD_PTR(prop_extras, property, entry);
+	}
+	HASH_WUNLOCK();
+	return entry->name;
+}
+
+const char *property_getAttributes(objc_property_t property)
+{
+	struct objc_property_extra* entry = NULL;
+	HASH_WLOCK();
+	HASH_FIND_PTR(prop_extras, &property, entry);
+	if (entry == NULL) {
+		entry = property_createExtras(property);
+    	HASH_ADD_PTR(prop_extras, property, entry);
+	}
+	HASH_WUNLOCK();
+	return entry->attributes;
+}
+
+SEL _property_getSetterSelector(objc_property_t property) {
+	return sel_registerName(property->setter_name);
+}
+
+SEL _property_getGetterSelector(objc_property_t property) {
+	return sel_registerName(property->getter_name);
+}
+
+const char *_property_getSetterTypes(objc_property_t property) {
+	return property->setter_types;
+}
+
+const char *_property_getGetterTypes(objc_property_t property) {
+	return property->getter_types;
 }
