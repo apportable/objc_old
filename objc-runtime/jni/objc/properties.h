@@ -60,14 +60,6 @@ struct objc_property
 	 */
 	const char isSynthesized;
 	/**
-	 * Name of the set method for this property.
-	 */
-	const char *setter_name;
-	/**
-	 * Type encoding of the setter for this property.
-	 */
-	const char *setter_types;
-	/**
 	 * Name of the getter for this property.
 	 */
 	const char *getter_name;
@@ -75,6 +67,14 @@ struct objc_property
 	 * Type encoding for the get method for this property.
 	 */
 	const char *getter_types;
+	/**
+	 * Name of the set method for this property.
+	 */
+	const char *setter_name;
+	/**
+	 * Type encoding of the setter for this property.
+	 */
+	const char *setter_types;
 };
 
 /**
