@@ -147,7 +147,7 @@ void objc_setProperty(id obj, SEL _cmd, int offset, id arg, BOOL isAtomic, BOOL 
 		old = *(id*)addr;
 		*(id*)addr = arg;
 	}
-	if(old != NULL && old->isa != NULL && old->isa != 0xdeadface)
+	if(old != NULL && old->isa != NULL && old->isa != (Class)0xdeadface)
 		[old release];
 }
 
@@ -228,9 +228,59 @@ struct objc_property_extra *property_createExtras(objc_property_t property) {
 	// G for getter, Example: Gval
 	// S for setter, Example: SsetVal:
 	// V for backing iVar, Example: V_val
-
-	char *attrs = calloc(256, 1);
+	size_t sz = 1; // add space for a \0
 	
+	if (!(property->attributes & OBJC_PR_assign))
+	{
+		sz += 2;
+	}
+
+	if (property->attributes & OBJC_PR_nonatomic)
+	{
+		sz += 2;
+	}
+
+	if (property->attributes & OBJC_PR_nonatomic)
+	{
+		sz += 2;
+	}
+
+	if (property->attributes & OBJC_PR_getter)
+	{
+		sz += 2;
+		if (property->getter_name != NULL)
+		{
+			sz += strlen(property->getter_name);
+		}
+	}
+
+	if(property->attributes & OBJC_PR_setter)
+	{
+		sz += 2;
+		if (property->setter_name != NULL)
+		{
+			sz += strlen(property->setter_name);
+		}
+	}
+
+	sz += 2;
+
+	if (property->name != NULL)
+	{
+		char *lastPipe = strrchr(property->name, '|');
+		if (lastPipe != NULL)
+		{
+			char *backing = lastPipe + 1;
+			sz += strlen(backing);
+		}
+		else
+		{
+			DEBUG_LOG("Property name has invalid backing ivar delimiter: clang must be generating BAD code!");
+		}
+	}
+
+	char *attrs = malloc(sz);
+	bzero(attrs, sz);
 	// Add type information
 	attrs = strcat(attrs, "T");
 	char *first = strchr(property->name, '|');
@@ -245,16 +295,38 @@ struct objc_property_extra *property_createExtras(objc_property_t property) {
 
 	if (property->attributes & OBJC_PR_getter) {
 		attrs = strcat(attrs, ",G");
-		attrs = strcat(attrs, property->getter_name);
+		if (property->getter_name != NULL)
+		{
+			attrs = strcat(attrs, property->getter_name);
+		}
+		else
+		{
+			DEBUG_LOG("Property name has invalid getter_name!");
+		}
 	}
 
 	if(property->attributes & OBJC_PR_setter) {
 		attrs = strcat(attrs, ",S");
-		attrs = strcat(attrs, property->setter_name);
+		if (property->setter_name != NULL)
+		{
+			attrs = strcat(attrs, property->setter_name);
+		}
+		else
+		{
+			DEBUG_LOG("Property name has invalid setter_name!");
+		}
 	}
 
 	attrs = strcat(attrs, ",V");
-	attrs = strcat(attrs, strrchr(property->name, '|') + 1);
+	if (property->name != NULL)
+	{
+		attrs = strcat(attrs, strrchr(property->name, '|') + 1);
+	}
+	else
+	{
+		DEBUG_LOG("Property name has invalid backing ivar!");
+	}
+
 	entry->attributes = attrs;
 
 	return entry;
