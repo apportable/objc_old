@@ -9,7 +9,7 @@
 #include <pthread.h>
 #include <unistd.h>
  
-typedef void *objcRefLock[10];
+typedef void *objcRefLock[10]; // Big enough for holding a pthread_rwlock_t
 objcRefLock _objcReferenceLock;
 
 int (*_objcRefRLock)(objcRefLock *lock) = NULL;
