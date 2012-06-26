@@ -19,6 +19,7 @@ endif
 ANDROID_NDK_ROOT :=/Developer/DestinyCloudFist/crystax-ndk-r7
 ANDROID_SDK_ROOT :=/Developer/DestinyCloudFist/android-sdk-mac_x86
 TRACK_OBJC_ALLOCATIONS ?= no
+EFENCE ?= no
 
 LOCAL_ASFLAGS   := -shared -Wl,-Bsymbolic 
 LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/4.4.3/ -lgnustl_shared
@@ -145,6 +146,14 @@ LOCAL_SRC_FILES :=  \
                     NSBlocks.o \
                     blocks/runtime.o \
                     blocks/data.o \
+
+ifeq ($(EFENCE),yes)
+LOCAL_SRC_FILES += \
+                    efence.o \
+                    page.o \
+                    print.o \
+
+endif
 
 # libunwind stubs
 LOCAL_SRC_FILES += unwind_stubs.o
