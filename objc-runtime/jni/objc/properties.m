@@ -210,16 +210,13 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 	}
 	return list;
 }
-struct objc_property_extra *property_createExtras(objc_property_t property) {
 
-	struct objc_property_extra *entry = (struct objc_property_extra *)malloc(sizeof(struct objc_property_extra));
-	entry->property = property;
-
-	// 1. Create the name
-	char *c = strchr(property->name, '|');
-	entry->name = strndup(property->name, c - property->name);
-
-	// 2. Create the attr string
+/* Function returns resulting string size and optionally makes string
+ *  in 'attrs' buffer. First call with 'attrs' being NULL, allocate
+ *  memory and call again.
+ */
+static size_t makeAttributeString(objc_property_t property, char *attrs) {
+	// Create the attr string
 	// Format of property attributes on iOS
 
 	// T for type name, Example: T@"NSString"
@@ -228,76 +225,45 @@ struct objc_property_extra *property_createExtras(objc_property_t property) {
 	// G for getter, Example: Gval
 	// S for setter, Example: SsetVal:
 	// V for backing iVar, Example: V_val
-	size_t sz = 1; // add space for a \0
-	
-	if (!(property->attributes & OBJC_PR_assign))
-	{
-		sz += 2;
+
+	// Start with the size for terminator.
+	size_t size = 1;
+
+	#define ATTRS_STRCAT(string) \
+		size += strlen(string); \
+		if (attrs) attrs = strcat(attrs, string)
+	#define ATTRS_STRNCAT(string, length) \
+		size += length; \
+		if (attrs) attrs = strncat(attrs, string, length)
+
+	// Prepare buffer for strcats.
+	if (attrs) {
+		*attrs = 0;
 	}
 
-	if (property->attributes & OBJC_PR_nonatomic)
-	{
-		sz += 2;
+	ATTRS_STRCAT("T");
+
+	const char *first = strchr(property->name, '|');
+	const char *last = strrchr(property->name, '|');
+
+	if (first && last) {
+		ATTRS_STRNCAT(first + 1, last - first - 1);
 	}
-
-	if (property->attributes & OBJC_PR_nonatomic)
-	{
-		sz += 2;
-	}
-
-	if (property->attributes & OBJC_PR_getter)
-	{
-		sz += 2;
-		if (property->getter_name != NULL)
-		{
-			sz += strlen(property->getter_name);
-		}
-	}
-
-	if(property->attributes & OBJC_PR_setter)
-	{
-		sz += 2;
-		if (property->setter_name != NULL)
-		{
-			sz += strlen(property->setter_name);
-		}
-	}
-
-	sz += 2;
-
-	if (property->name != NULL)
-	{
-		char *lastPipe = strrchr(property->name, '|');
-		if (lastPipe != NULL)
-		{
-			char *backing = lastPipe + 1;
-			sz += strlen(backing);
-		}
-		else
-		{
-			DEBUG_LOG("Property name has invalid backing ivar delimiter: clang must be generating BAD code!");
-		}
-	}
-
-	char *attrs = malloc(sz);
-	bzero(attrs, sz);
-	// Add type information
-	attrs = strcat(attrs, "T");
-	char *first = strchr(property->name, '|');
-	attrs = strncat(attrs, first + 1, strrchr(property->name, '|') - first - 1);
 
 	// & for retain
-	if (!(property->attributes & OBJC_PR_assign))
-		attrs = strcat(attrs, ",&");
+	if (!(property->attributes & OBJC_PR_assign)) {
+		ATTRS_STRCAT(",&");
+	}
 
-	if (property->attributes & OBJC_PR_nonatomic)
-		attrs = strcat(attrs, ",N");
+	if (property->attributes & OBJC_PR_nonatomic) {
+		ATTRS_STRCAT(",N");
+	}
 
 	if (property->attributes & OBJC_PR_getter) {
-		attrs = strcat(attrs, ",G");
+		ATTRS_STRCAT(",G");
 		if (property->getter_name != NULL)
 		{
-			attrs = strcat(attrs, property->getter_name);
+			ATTRS_STRCAT(property->getter_name);
 		}
 		else
 		{
@@ -306,10 +272,10 @@ struct objc_property_extra *property_createExtras(objc_property_t property) {
 	}
 
 	if(property->attributes & OBJC_PR_setter) {
-		attrs = strcat(attrs, ",S");
+		ATTRS_STRCAT(",S");
 		if (property->setter_name != NULL)
 		{
-			attrs = strcat(attrs, property->setter_name);
+			ATTRS_STRCAT(property->setter_name);
 		}
 		else
 		{
@@ -317,16 +283,31 @@ struct objc_property_extra *property_createExtras(objc_property_t property) {
 		}
 	}
 
-	attrs = strcat(attrs, ",V");
-	if (property->name != NULL)
-	{
-		attrs = strcat(attrs, strrchr(property->name, '|') + 1);
-	}
-	else
-	{
-		DEBUG_LOG("Property name has invalid backing ivar!");
+	ATTRS_STRCAT(",V");
+
+	if (last) {
+		ATTRS_STRCAT(last + 1);
 	}
 
+	return size;
+
+	#undef ATTRS_STRCAT
+	#undef ATTRS_STRNCAT
+}
+
+struct objc_property_extra *property_createExtras(objc_property_t property) {
+
+	struct objc_property_extra *entry = (struct objc_property_extra *)malloc(sizeof(struct objc_property_extra));
+	entry->property = property;
+
+	// 1. Create the name
+	const char *c = strchr(property->name, '|');
+	entry->name = strndup(property->name, c - property->name);
+
+	// 2. Create the attr string
+	size_t attrsSize = makeAttributeString(property, NULL);
+	char *attrs = malloc(attrsSize);
+	makeAttributeString(property, attrs);
 	entry->attributes = attrs;
 
 	return entry;
