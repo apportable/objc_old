@@ -87,3 +87,26 @@ void track_deallocation(Class cls)
 	log_allocations();
 	pthread_mutex_unlock(&allocationLock);
 }
+
+void track_swizzle(Class from, Class to)
+{
+	pthread_mutex_lock(&allocationLock);
+	objc_allocations *fromEntry = NULL;
+	HASH_FIND_PTR(allocations, &from, fromEntry);
+	if (fromEntry != NULL)
+	{
+		objc_allocations *toEntry = NULL;
+		HASH_FIND_PTR(allocations, &to, toEntry);
+		if (toEntry == NULL)
+		{
+			toEntry = malloc(sizeof(objc_allocations));
+			toEntry->cls = to;
+			toEntry->count = 0;
+			HASH_ADD_PTR(allocations, cls, toEntry);
+		}
+		fromEntry->count = fromEntry->count - 1;
+		toEntry->count = toEntry->count +1;
+	}
+	log_allocations();
+	pthread_mutex_unlock(&allocationLock);
+}

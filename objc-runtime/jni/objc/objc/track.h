@@ -11,6 +11,7 @@ void track_enable(int interval);
 void track_disable();
 void track_allocation(Class cls);
 void track_deallocation(Class cls);
+void track_swizzle(Class from, Class to);
 
 #ifdef __cplusplus
 }
