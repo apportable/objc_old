@@ -455,11 +455,6 @@ extern void objc_setAssociatedObject(id object, const void *key, id value, objc_
 extern id objc_getAssociatedObject(id object, const void *key);
 extern void objc_removeAssociatedObjects(id object);
 
-#if defined(TRACK_OBJC_ALLOCATIONS)
-extern void track_allocation(Class aClass);
-extern void track_deallocation(Class aClass);
-#endif
-
 #if defined(__cplusplus)
 }
 #endif

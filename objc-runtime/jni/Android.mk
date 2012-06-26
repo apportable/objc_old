@@ -155,6 +155,11 @@ LOCAL_SRC_FILES += \
 
 endif
 
+ifeq ($(TRACK_OBJC_ALLOCATIONS),yes)
+LOCAL_SRC_FILES += track.o
+
+endif
+
 # libunwind stubs
 LOCAL_SRC_FILES += unwind_stubs.o
 
