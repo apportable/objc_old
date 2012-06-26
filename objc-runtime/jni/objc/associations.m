@@ -9,7 +9,7 @@
 #include <pthread.h>
 #include <unistd.h>
  
-typedef pthread_mutex_t objcRefLock;
+typedef void *objcRefLock[10];
 objcRefLock _objcReferenceLock;
 
 int (*_objcRefRLock)(objcRefLock *lock) = NULL;
