@@ -21,7 +21,7 @@ struct objc_property_extra {
 static struct objc_property_extra* prop_extras = NULL;
 
 
-typedef void *objcRefLock[10];
+typedef void *objcRefLock[10]; // Big enough for holding a pthread_rwlock_t
 objcRefLock _objcPropertyLock;
 
 extern int (*_objcRefRLock)(objcRefLock *lock);
