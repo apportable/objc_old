@@ -1,5 +1,8 @@
 LOCAL_PATH := $(call my-dir)
 
+ANALYZE          ?= no
+ANALYZE_OUTPUT   ?=/dev/null
+
 # Build Objective-C Runtime
 include $(CLEAR_VARS)
 TARGET_ARCH_ABI  ?= armeabi-7a
@@ -206,6 +209,9 @@ MODULE_OBJCFLAGS := $(COMMON_OBJCFLAGS) $(LOCAL_OBJCFLAGS)
 
 .SECONDARY: ;
 
+ifneq ("$(ANALYZE)", "yes")
+# Start Compile Rules
+
 $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.mm .SECONDARY
 	@echo Compiling .mm $<
 	@mkdir -p $(dir $@)
@@ -244,6 +250,41 @@ $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.s
 	mkdir -p $(dir $@)
 	@$(CC) $(MODULE_ASFLAGS) -c $< -o $@
 
+
+# End Compile Rules
+else
+# Start Analyze Rules
+
+$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.mm
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+
+$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.cc
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+
+$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.cpp
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+
+$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.c
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+
+$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.m
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+
+$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.s
+  @echo Skipping analysis $<
+
+# End Analyze Rules
+endif
 
 include $(BUILD_SHARED_LIBRARY)
 
