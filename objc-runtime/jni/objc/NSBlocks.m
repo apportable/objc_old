@@ -30,7 +30,7 @@ static void _NSBlockRelease(void *src, SEL _cmd) {
 }
 
 static void *_NSBlockRetain(void *src, SEL _cmd) {
-	return _Block_copy(src);
+	return _Block_retain(src);
 }
 
 static id _NSBlockDescription(void *src, SEL _cmd) {

@@ -491,9 +491,27 @@ void _Block_release(void *arg) {
 }
 
 void *_Block_retain(void *arg) {
-    struct Block_layout *aBlock = (struct Block_layout *)arg;
-    latching_incr_int(&aBlock->flags) & BLOCK_REFCOUNT_MASK;
-    return aBlock;
+    struct Block_layout *aBlock;
+    const bool wantsOne = true;
+
+    if (!arg) {
+        return NULL;
+    }
+
+    aBlock = (struct Block_layout *)arg;
+    if (aBlock->flags & BLOCK_NEEDS_FREE) {
+        latching_incr_int(&aBlock->flags);
+        return aBlock;
+    }
+    else if (aBlock->flags & BLOCK_IS_GC) {
+        if (wantsOne && ((latching_incr_int(&aBlock->flags) & BLOCK_REFCOUNT_MASK) == 1)) {
+            _Block_setHasRefcount(aBlock, true);
+        }
+        return aBlock;
+    }
+    else {
+        return _Block_copy_internal(aBlock, WANTS_ONE);
+    }
 }
 
 
