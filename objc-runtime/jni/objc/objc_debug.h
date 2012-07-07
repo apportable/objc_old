@@ -8,6 +8,10 @@
 #ifndef _OBJC_DEBUG_H_
 #define _OBJC_DEBUG_H_
 
+#ifdef ANDROID
+#include <android/log.h>
+#endif
+
 #if !defined(DEBUG_LOG)
 #if !defined(NDEBUG) && defined(ANDROID)
 #include <android/log.h>
@@ -20,9 +24,13 @@
 #endif
 #endif
 
+#define RELEASE_LOG(format, ...) \
+    __android_log_print(ANDROID_LOG_WARN, "objc", \
+        "%s:%d: %s(): " format, \
+        __FILE__, __LINE__, __FUNCTION__, ##__VA_ARGS__)
+
 #if !defined(DEBUG_BREAK)
 #if !defined(NDEBUG) && defined(ANDROID)
-#include <android/log.h>
 #define DEBUG_BREAK() { ((void)__android_log_print(ANDROID_LOG_WARN, "objc", \
                             "DEBUG_BREAK: Hit breakpoint at %s:%d",          \
                             __FILE__, __LINE__));                            \

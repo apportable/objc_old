@@ -8,6 +8,28 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef HANDLE_ILL_RECEIVERS
+
+#define IS_ILL_RECEIVER(receiver) \
+	(((uintptr_t)(receiver)) < 0x10000)
+
+static BOOL check_ill_receiver(const char* function, SEL selector,
+                               const void* receiver, const char* receiverString)
+{
+	if (IS_ILL_RECEIVER(receiver))
+	{
+		RELEASE_LOG("WARNING: %s() treated ill receiver %p (%s) as nil while sending %s!",
+			function, receiver, receiverString, (selector ? sel_getName(selector) : NULL));
+		return YES;
+	}
+	return NO;
+}
+
+#define CHECK_ILL_RECEIVER(receiver, selector) \
+	check_ill_receiver(__FUNCTION__, selector, receiver, #receiver)
+
+#endif // HANDLE_ILL_RECEIVERS
+
 void objc_send_initialize(id object);
 
 // Removed __thread because __thread isn't supported on Windows.
@@ -16,6 +38,9 @@ id objc_msg_sender;
 static id nil_method(id self, SEL _cmd) {
 #ifndef NDEBUG
   const char *name = sel_getName(_cmd);
+#ifdef HANDLE_ILL_RECEIVERS
+  if (!self || !IS_ILL_RECEIVER(self))
+#endif
   if (self && strcmp(name, "release")) {
       DEBUG_LOG("Missing implementation of %s %s", self == NULL ? "<INVALID>" : class_getName(object_getClass(self)), name);
   }
@@ -50,14 +75,22 @@ static struct objc_slot* objc_selector_type_mismatch(Class cls, SEL
 }
 struct objc_slot* (*_objc_selector_type_mismatch)(Class cls, SEL
 		selector, struct objc_slot *result) = objc_selector_type_mismatch;
-static 
 
+static
 __attribute__((always_inline))
 Slot_t objc_msg_lookup_internal(id *receiver,
                                 SEL selector, 
                                 id sender)
 {
 retry:;
+#ifdef HANDLE_ILL_RECEIVERS
+	if (CHECK_ILL_RECEIVER(*receiver, selector)
+		|| CHECK_ILL_RECEIVER((*receiver)->isa, selector)
+		|| CHECK_ILL_RECEIVER((*receiver)->isa->dtable, selector))
+	{
+		return &nil_slot;
+	}
+#endif
 	Slot_t result = objc_dtable_lookup((*receiver)->isa->dtable,
 			PTR_TO_IDX(selector->name));
 	if (0 == result)
@@ -151,6 +184,13 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 
 Slot_t objc_slot_lookup_super(struct objc_super *super, SEL selector)
 {
+#ifdef HANDLE_ILL_RECEIVERS
+	if (CHECK_ILL_RECEIVER(super, selector)
+		|| CHECK_ILL_RECEIVER(super->receiver, selector))
+	{
+		return &nil_slot;
+	}
+#endif
 	id receiver = super->receiver;
 	if (receiver)
 	{
