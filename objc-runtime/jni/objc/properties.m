@@ -5,7 +5,6 @@
 #include <unistd.h>
 #include "class.h"
 #include "properties.h"
-#include "objc_debug.h"
 #include "uthash.h"
 #include <pthread.h>
 

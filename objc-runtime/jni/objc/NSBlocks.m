@@ -3,7 +3,6 @@
 #import "lock.h"
 #import "blocks/Block_private.h"
 #import "dtable.h"
-#include "objc_debug.h"
 #include <assert.h>
 
 static struct objc_class __NSBlock;

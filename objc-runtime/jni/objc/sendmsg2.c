@@ -3,7 +3,6 @@
 #include "dtable.h"
 #include "selector.h"
 #include "loader.h"
-#include "objc_debug.h"
 #include "objc/hooks.h"
 #include <stdint.h>
 #include <stdio.h>

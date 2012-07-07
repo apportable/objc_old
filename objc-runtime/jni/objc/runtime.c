@@ -6,7 +6,6 @@
 #include "method_list.h"
 #include "lock.h"
 #include "dtable.h"
-#include "objc_debug.h"
 
 /* Make glibc export strdup() */
 
