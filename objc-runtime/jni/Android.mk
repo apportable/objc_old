@@ -209,7 +209,7 @@ MODULE_OBJCFLAGS := $(COMMON_OBJCFLAGS) $(LOCAL_OBJCFLAGS)
 
 .SECONDARY: ;
 
-DEBUG_LOGGING_FLAGS?=
+DEBUG_LOGGING_FLAGS ?= -DDEBUG_LOG\(...\)=do\{\}while\(0\)\; -DDEBUG_BREAK\(\)=do\{\}while\(0\)\;
 
 ifneq ("$(ANALYZE)", "yes")
 # Start Compile Rules
