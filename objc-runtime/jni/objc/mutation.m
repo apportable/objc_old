@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "objc_debug.h"
 
 void objc_enumerationMutation(id obj)
 {

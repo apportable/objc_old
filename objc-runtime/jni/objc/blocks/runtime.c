@@ -28,7 +28,6 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "../objc_debug.h"
 
 #ifdef HAVE_AVAILABILITY_MACROS_H
 #include <AvailabilityMacros.h>

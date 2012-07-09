@@ -33,7 +33,6 @@
 #include <sys/time.h>
 #include <pthread.h>
 #include <errno.h>
-#include "objc_debug.h"
 //
 // Code by Nick Kledzik
 //
