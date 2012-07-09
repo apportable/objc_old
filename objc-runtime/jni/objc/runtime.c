@@ -272,6 +272,10 @@ id class_createInstance(Class cls, size_t extraBytes)
 
 Method class_getInstanceMethod(Class aClass, SEL aSelector)
 {
+    if(aSelector == NULL)
+    {
+        return NULL;
+    }
 	// Do a dtable lookup to find out which class the method comes from.
 	struct objc_slot *slot = objc_get_slot(aClass, aSelector);
 	if (NULL == slot) { return NULL; }
@@ -449,21 +453,29 @@ id object_getIvar(id object, Ivar ivar) {
 
 void object_setIvar(id object, Ivar ivar, id value)
 {
-    static int warned = 0;
-    if (warned == 0)
-    {
-        warned = 1;
-        DEBUG_LOG("Completely scary code for setting ivars directly incoming; YOU HAVE BEEN WARNED!");
-    }
-    if (object != NULL && ivar != NULL)
-    {
-    	// Uncomment this if the retain cycles are incorrect
-    	// SEL retainSel = sel_getUid("retain");
-    	// IMP retainImp = class_getInstanceMethod(object_getClass(value), retainSel);
-    	// if (retainImp != NULL)
-    	// 	value = retainImp(value, retainSel);
+    if (object != NULL && ivar != NULL) {
         *(id **)(((void *)object) + ivar_getOffset(ivar)) = value;
     }
+}
+
+Ivar object_setInstanceVariable(id obj, const char *name, void *value) {
+    if(obj == NULL || name == NULL) {
+        return NULL;
+    }
+
+    Ivar ivar = class_getInstanceVariable(object_getClass(obj), name);
+    object_setIvar(obj, ivar, (id)value);
+    return ivar;
+}
+
+Ivar object_getInstanceVariable(id obj, const char *name, void **outValue) {
+    if(obj == NULL || name == NULL) {
+        return NULL;
+    }
+
+    Ivar ivar = class_getInstanceVariable(object_getClass(obj), name);
+    *outValue = object_getIvar(obj, ivar);
+    return ivar;
 }
 
 void method_exchangeImplementations(Method m1, Method m2)
