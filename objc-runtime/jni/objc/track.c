@@ -2,7 +2,7 @@
 //  track.m
 //  objc
 //
- 
+
 #include "objc/runtime.h"
 #include "uthash.h"
 #include <pthread.h>
@@ -20,6 +20,24 @@ static pthread_mutex_t allocationLock = PTHREAD_MUTEX_INITIALIZER;
 static int track_enabled = 1;
 static int track_interval = 5000;
 
+static void force_log_allocations()
+{
+    objc_allocations *entry, *tmp;
+    DEBUG_LOG("===================ALLOCATIONS===================");
+    HASH_ITER(hh, allocations, entry, tmp)
+    {
+        if (entry->cls == (Class)0xdeadface)
+        {
+            DEBUG_LOG("DEADFACE'd objects: %d", entry->count);
+        }
+        else
+        {
+            DEBUG_LOG("%s %d", class_getName(entry->cls), entry->count);
+        }
+    }
+    DEBUG_LOG("=================================================");
+}
+
 static void log_allocations()
 {
 	static int idx = 0;
@@ -28,20 +46,7 @@ static void log_allocations()
 		idx = (idx + 1) % track_interval;
 		if (idx == 0)
 		{
-			objc_allocations *entry, *tmp;
-			DEBUG_LOG("===================ALLOCATIONS===================");
-			HASH_ITER(hh, allocations, entry, tmp) 
-			{
-				if (entry->cls == (Class)0xdeadface)
-				{
-					DEBUG_LOG("DEADFACE'd objects: %d", entry->count);
-				}
-				else
-				{
-					DEBUG_LOG("%s %d", class_getName(entry->cls), entry->count);
-				}
-			}
-			DEBUG_LOG("=================================================");
+            force_log_allocations();
 		}
 	}
 }
@@ -57,6 +62,28 @@ void track_disable()
 	track_enabled = 0;
 }
 
+static Class breakClass = (Class)NULL;
+static int minAllocationsToBreakOn = 0;
+
+void break_on_allocations_of_class_above(Class cls, int n) {
+    breakClass = cls;
+    minAllocationsToBreakOn = n;
+}
+
+void break_on_allocation_of_class(Class cls) {
+    break_on_allocations_of_class_above(cls, 0);
+}
+
+void remove_class_allocation_break() {
+    breakClass = (Class)NULL;
+}
+
+void maybe_break_on_allocation(Class cls, numAllocs) {
+    if (numAllocs >= minAllocationsToBreakOn && cls == breakClass) {
+        DEBUG_BREAK();
+    }
+}
+
 void track_allocation(Class cls)
 {
 	pthread_mutex_lock(&allocationLock);
@@ -70,6 +97,7 @@ void track_allocation(Class cls)
 		HASH_ADD_PTR(allocations, cls, entry);
 	}
 	entry->count = entry->count + 1;
+    maybe_break_on_allocation(cls, entry->count);
 	log_allocations();
 	pthread_mutex_unlock(&allocationLock);
 }
