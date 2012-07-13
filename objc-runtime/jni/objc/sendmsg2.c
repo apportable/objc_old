@@ -12,10 +12,6 @@
 #define IS_ILL_RECEIVER(receiver) \
 	(((uintptr_t)(receiver)) < 0x10000)
 
-#ifndef RELEASE_LOG
-#define RELEASE_LOG(...)
-#endif
-
 static BOOL check_ill_receiver(const char* function, SEL selector,
                                const void* receiver, const char* receiverString)
 {
