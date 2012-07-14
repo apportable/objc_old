@@ -17,8 +17,8 @@ static BOOL check_ill_receiver(const char* function, SEL selector,
 {
 	if (IS_ILL_RECEIVER(receiver))
 	{
-		RELEASE_LOG("WARNING: %s() treated ill receiver %p (%s) as nil while sending %s!",
-			function, receiver, receiverString, (selector ? sel_getName(selector) : NULL));
+		// RELEASE_LOG("WARNING: %s() treated ill receiver %p (%s) as nil while sending %s!",
+			// function, receiver, receiverString, (selector ? sel_getName(selector) : NULL));
 		return YES;
 	}
 	return NO;
