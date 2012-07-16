@@ -83,18 +83,19 @@ LOCAL_CFLAGS    +=  \
 
 ifeq ($(TARGET_ARCH_ABI),x86)
 LOCAL_CFLAGS    +=  \
-                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-14/arch-x86/usr/include/ \
                     -nostdinc \
-                    -I/$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/i686-android-linux/4.4.3/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/i686-android-linux/4.4.3/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/$(HOST_OS)-$(HOST_ARCH)/usr/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/$(HOST_OS)-$(HOST_ARCH)/usr/include/linux/ \
 
 else
 LOCAL_CFLAGS    +=  \
                     -nostdinc \
-                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm/usr/include/ \
                     -isystem $(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/arm-linux-androideabi/4.4.3/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm/usr/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm/usr/include/linux/ \
 
 endif
-
 
 ifeq ($(TRACK_OBJC_ALLOCATIONS),yes)
   LOCAL_CFLAGS += \
@@ -215,7 +216,7 @@ MODULE_OBJCFLAGS := $(COMMON_OBJCFLAGS) $(LOCAL_OBJCFLAGS)
 
 .SECONDARY: ;
 
-DEBUG_LOGGING_FLAGS ?= -DDEBUG_LOG\(...\)=do\{\}while\(0\)\; -DDEBUG_BREAK\(\)=do\{\}while\(0\)\;
+DEBUG_LOGGING_FLAGS ?= -DDEBUG_LOG\(...\)=do\{\}while\(0\)\; -DDEBUG_BREAK\(\)=do\{\}while\(0\)\; -DRELEASE_LOG\(...\)=do\{\}while\(0\);
 
 ifneq ("$(ANALYZE)", "yes")
 # Start Compile Rules
