@@ -94,6 +94,10 @@ retry:;
 	{
 		return &nil_slot;
 	}
+	if ((*receiver)->isa == (Class)0xdeadface)
+	{
+		return &nil_slot;
+	}
 #endif
 	Slot_t result = objc_dtable_lookup((*receiver)->isa->dtable,
 			PTR_TO_IDX(selector->name));
@@ -358,6 +362,12 @@ BOOL __objc_responds_to(id object, SEL sel)
 
 IMP get_imp(Class cls, SEL selector)
 {
+#ifdef HANDLE_ILL_RECEIVERS
+	if (cls == (Class)0xdeadface)
+	{
+		return nil_method;
+	}
+#endif
 	Slot_t slot = objc_get_slot(cls, selector);
 	return NULL != slot ? slot->method : NULL;
 }
