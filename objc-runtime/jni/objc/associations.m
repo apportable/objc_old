@@ -202,8 +202,9 @@ id objc_getAssociatedObject(id object, const void *key)
         HASH_FIND_PTR(object_entry->associations, &key, association_entry);
         if (association_entry != NULL)
         {
+            id value = association_entry->value;
         	HASH_RUNLOCK();
-            return association_entry->value;
+            return value;
         }
     }
     HASH_RUNLOCK();
