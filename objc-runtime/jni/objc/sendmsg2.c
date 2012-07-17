@@ -96,6 +96,7 @@ retry:;
 	}
 	if ((*receiver)->isa == (Class)0xdeadface)
 	{
+		DEBUG_BREAK();
 		return &nil_slot;
 	}
 #endif
@@ -365,6 +366,7 @@ IMP get_imp(Class cls, SEL selector)
 #ifdef HANDLE_ILL_RECEIVERS
 	if (cls == (Class)0xdeadface)
 	{
+		DEBUG_BREAK();
 		return nil_method;
 	}
 #endif

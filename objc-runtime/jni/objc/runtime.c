@@ -278,6 +278,7 @@ Method class_getInstanceMethod(Class aClass, SEL aSelector)
 #ifdef HANDLE_ILL_RECEIVERS
     if (aClass == (Class)0xdeadface)
     {
+    	DEBUG_BREAK();
     	return NULL;
     }
 #endif
@@ -657,6 +658,7 @@ Class object_getClass(id obj)
 #ifdef HANDLE_ILL_RECEIVERS
 		if (isa == (Class)0xdeadface)
 		{
+			DEBUG_BREAK();
 			return (Class)0xdeadface;
 		}
 #endif
