@@ -275,6 +275,13 @@ Method class_getInstanceMethod(Class aClass, SEL aSelector)
     {
         return NULL;
     }
+#ifdef HANDLE_ILL_RECEIVERS
+    if (aClass == (Class)0xdeadface)
+    {
+    	DEBUG_BREAK();
+    	return NULL;
+    }
+#endif
 	// Do a dtable lookup to find out which class the method comes from.
 	struct objc_slot *slot = objc_get_slot(aClass, aSelector);
 	if (NULL == slot) { return NULL; }
@@ -648,6 +655,13 @@ Class object_getClass(id obj)
 	if (nil != obj)
 	{
 		Class isa = obj->isa;
+#ifdef HANDLE_ILL_RECEIVERS
+		if (isa == (Class)0xdeadface)
+		{
+			DEBUG_BREAK();
+			return (Class)0xdeadface;
+		}
+#endif
 		while ((Nil != isa) && objc_test_class_flag(isa, objc_class_flag_hidden_class))
 		{
 			isa = isa->super_class;

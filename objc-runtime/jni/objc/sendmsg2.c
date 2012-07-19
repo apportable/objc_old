@@ -17,8 +17,8 @@ static BOOL check_ill_receiver(const char* function, SEL selector,
 {
 	if (IS_ILL_RECEIVER(receiver))
 	{
-		RELEASE_LOG("WARNING: %s() treated ill receiver %p (%s) as nil while sending %s!",
-			function, receiver, receiverString, (selector ? sel_getName(selector) : NULL));
+		// RELEASE_LOG("WARNING: %s() treated ill receiver %p (%s) as nil while sending %s!",
+			// function, receiver, receiverString, (selector ? sel_getName(selector) : NULL));
 		return YES;
 	}
 	return NO;
@@ -34,7 +34,7 @@ void objc_send_initialize(id object);
 // Removed __thread because __thread isn't supported on Windows.
 id objc_msg_sender;
 
-static id nil_method(id self, SEL _cmd) {
+static id nil_method(id self, SEL _cmd, ...) {
 #ifndef NDEBUG
   const char *name = sel_getName(_cmd);
 #ifdef HANDLE_ILL_RECEIVERS
@@ -47,7 +47,10 @@ static id nil_method(id self, SEL _cmd) {
   return nil;
 }
 
+
+
 static struct objc_slot nil_slot = { Nil, Nil, "", 1, (IMP)nil_method };
+struct objc_slot forward_slot = { Nil, Nil, "", 1, (IMP)nil_method };
 
 typedef struct objc_slot *Slot_t;
 
@@ -56,9 +59,11 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender);
 // Default implementations of the two new hooks.  Return NULL.
 static id objc_proxy_lookup_null(id receiver, SEL op) { return nil; }
 static Slot_t objc_msg_forward3_null(id receiver, SEL op) { return &nil_slot; }
+static Slot_t objc_msg_forward4_null(id receiver, SEL op) { return &forward_slot; }
 
 id (*objc_proxy_lookup)(id receiver, SEL op) = objc_proxy_lookup_null;
 Slot_t (*__objc_msg_forward3)(id receiver, SEL op) = objc_msg_forward3_null;
+Slot_t (*__objc_msg_forward4)(id receiver, SEL op) = objc_msg_forward4_null;
 
 static struct objc_slot* objc_selector_type_mismatch(Class cls, SEL
 		selector, Slot_t result)
@@ -87,6 +92,11 @@ retry:;
 		|| CHECK_ILL_RECEIVER((*receiver)->isa, selector)
 		|| CHECK_ILL_RECEIVER((*receiver)->isa->dtable, selector))
 	{
+		return &nil_slot;
+	}
+	if ((*receiver)->isa == (Class)0xdeadface)
+	{
+		DEBUG_BREAK();
 		return &nil_slot;
 	}
 #endif
@@ -133,7 +143,7 @@ retry:;
 			}
 			if (0 == result)
 			{
-				result = __objc_msg_forward3(*receiver, selector);
+				result = __objc_msg_forward4(*receiver, selector);
 			}
 		}
 	}
@@ -353,6 +363,13 @@ BOOL __objc_responds_to(id object, SEL sel)
 
 IMP get_imp(Class cls, SEL selector)
 {
+#ifdef HANDLE_ILL_RECEIVERS
+	if (cls == (Class)0xdeadface)
+	{
+		DEBUG_BREAK();
+		return nil_method;
+	}
+#endif
 	Slot_t slot = objc_get_slot(cls, selector);
 	return NULL != slot ? slot->method : NULL;
 }
