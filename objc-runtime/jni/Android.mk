@@ -238,13 +238,13 @@ $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.cpp .SECONDARY
 
 $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.c .SECONDARY
 	@echo Compiling .c $<
-	mkdir -p $(dir $@)
-	$(CC) -MD -MT $@ $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
+	@mkdir -p $(dir $@)
+	@$(CC) -MD -MT $@ $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
 $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.m .SECONDARY
 	@echo Compiling .m $<
-	mkdir -p $(dir $@)
-	$(CC) -MD -MT $@ $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
+	@mkdir -p $(dir $@)
+	@$(CC) -MD -MT $@ $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
 $(OBJDIR)/%.fixed.s: $(OBJDIR)/%.out.s .SECONDARY
 	@echo fixing $<
