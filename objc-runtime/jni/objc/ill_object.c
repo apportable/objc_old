@@ -6,7 +6,7 @@
 #include "dtable.h"
 #include "uthash.h"
 
-const time_t defer_timeout_seconds = 5;
+const time_t defer_timeout_seconds = 20;
 const size_t max_deferred_objects = 10000;
 const size_t min_object_size = 4;
 const size_t max_object_size = 64;
@@ -99,6 +99,7 @@ static BOOL is_deferrable_object_class(Class clazz)
 static void destroy_deferred_object(deferred_object* dobject)
 {
 	HASH_DEL(deferred_object_map, dobject);
+	dobject->object->isa = 0xDEADFACE;
 	free(dobject->object);
 }
 
@@ -253,4 +254,3 @@ BOOL is_ill_object(id object, char** why_ill)
 }
 
 #endif // CHECK_ILL_OBJECTS
-
