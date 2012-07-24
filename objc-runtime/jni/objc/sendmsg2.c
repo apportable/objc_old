@@ -6,7 +6,28 @@
 #include "objc/hooks.h"
 #include <stdint.h>
 #include <stdio.h>
-#include "objc/ill_object.h"
+
+#ifdef HANDLE_ILL_RECEIVERS
+
+#define IS_ILL_RECEIVER(receiver) \
+	(((uintptr_t)(receiver)) < 0x10000)
+
+static BOOL check_ill_receiver(const char* function, SEL selector,
+                               const void* receiver, const char* receiverString)
+{
+	if (IS_ILL_RECEIVER(receiver))
+	{
+		// RELEASE_LOG("WARNING: %s() treated ill receiver %p (%s) as nil while sending %s!",
+			// function, receiver, receiverString, (selector ? sel_getName(selector) : NULL));
+		return YES;
+	}
+	return NO;
+}
+
+#define CHECK_ILL_RECEIVER(receiver, selector) \
+	check_ill_receiver(__FUNCTION__, selector, receiver, #receiver)
+
+#endif // HANDLE_ILL_RECEIVERS
 
 void objc_send_initialize(id object);
 
@@ -16,8 +37,11 @@ id objc_msg_sender;
 static id nil_method(id self, SEL _cmd, ...) {
 #ifndef NDEBUG
   const char *name = sel_getName(_cmd);
+#ifdef HANDLE_ILL_RECEIVERS
+  if (!self || !IS_ILL_RECEIVER(self))
+#endif
   if (self && strcmp(name, "release")) {
-      DEBUG_LOG("Missing implementation of %s %s", (self == NULL || IS_ILL_OBJECT(self))? "<INVALID>" : class_getName(object_getClass(self)), name);
+      DEBUG_LOG("Missing implementation of %s %s", self == NULL ? "<INVALID>" : class_getName(object_getClass(self)), name);
   }
 #endif
   return nil;
@@ -63,10 +87,19 @@ Slot_t objc_msg_lookup_internal(id *receiver,
                                 id sender)
 {
 retry:;
-	if (CHECK_ILL_OBJECT_WHEN(*receiver, "looking up a selector %s", sel_getName(selector)))
+#ifdef HANDLE_ILL_RECEIVERS
+	if (CHECK_ILL_RECEIVER(*receiver, selector)
+		|| CHECK_ILL_RECEIVER((*receiver)->isa, selector)
+		|| CHECK_ILL_RECEIVER((*receiver)->isa->dtable, selector))
 	{
 		return &nil_slot;
 	}
+	if ((*receiver)->isa == (Class)0xdeadface)
+	{
+		DEBUG_BREAK();
+		return &nil_slot;
+	}
+#endif
 	Slot_t result = objc_dtable_lookup((*receiver)->isa->dtable,
 			PTR_TO_IDX(selector->name));
 	if (0 == result)
@@ -160,11 +193,13 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 
 Slot_t objc_slot_lookup_super(struct objc_super *super, SEL selector)
 {
-	if (CHECK_ILL_OBJECT_WHEN(super->receiver,
-			"looking up super selector %s", sel_getName(selector)))
+#ifdef HANDLE_ILL_RECEIVERS
+	if (CHECK_ILL_RECEIVER(super, selector)
+		|| CHECK_ILL_RECEIVER(super->receiver, selector))
 	{
 		return &nil_slot;
 	}
+#endif
 	id receiver = super->receiver;
 	if (receiver)
 	{
@@ -328,10 +363,13 @@ BOOL __objc_responds_to(id object, SEL sel)
 
 IMP get_imp(Class cls, SEL selector)
 {
-	if (CHECK_ILL_CLASS_WHEN(cls, "getting imp for %s", sel_getName(selector)))
+#ifdef HANDLE_ILL_RECEIVERS
+	if (cls == (Class)0xdeadface)
 	{
+		DEBUG_BREAK();
 		return nil_method;
 	}
+#endif
 	Slot_t slot = objc_get_slot(cls, selector);
 	return NULL != slot ? slot->method : NULL;
 }

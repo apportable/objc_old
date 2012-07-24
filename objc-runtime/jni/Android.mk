@@ -47,8 +47,11 @@ ifeq ($(BUILD), release)
 
 endif
 
-ifeq ($(CHECK_ILL_OBJECTS), yes)
-LOCAL_CFLAGS += -DCHECK_ILL_OBJECTS
+ifeq ($(BUILD), release)
+# This will make message send functions treat receivers that
+#  are small enough to be definately invalid (like 0x12) as
+#  nil receivers.
+LOCAL_CFLAGS += -DHANDLE_ILL_RECEIVERS
 endif
 
 LOCAL_OBJCFLAGS += -ferror-limit=5 -fblocks -DNS_BLOCKS_AVAILABLE
@@ -154,7 +157,6 @@ LOCAL_SRC_FILES :=  \
                     NSBlocks.o \
                     blocks/runtime.o \
                     blocks/data.o \
-                    ill_object.o \
 
 ifeq ($(EFENCE),yes)
 LOCAL_SRC_FILES += \

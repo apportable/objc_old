@@ -1,5 +1,4 @@
 #include "objc/runtime.h"
-#include "objc/ill_object.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -147,11 +146,8 @@ void objc_setProperty(id obj, SEL _cmd, int offset, id arg, BOOL isAtomic, BOOL 
 		old = *(id*)addr;
 		*(id*)addr = arg;
 	}
-	if (CHECK_ILL_OBJECT_WHEN(old, "inside objc_setProperty()"))
-	{
-		return;
-	}
-	[old release];
+	if(old != NULL && old->isa != NULL && old->isa != (Class)0xdeadface)
+		[old release];
 }
 
 objc_property_t class_getProperty(Class cls, const char *name)
