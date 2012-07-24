@@ -13,18 +13,15 @@ CCFLAGS = \
 # because it doesn't always reproduce.
 CCFLAGS += -DMAP_TABLE_NO_LOCK
 
-ifeq ($(BUILD), release)
-# This will make message send functions treat receivers that
-#  are small enough to be definately invalid (like 0x12) as
-#  nil receivers.
-CCFLAGS += -DHANDLE_ILL_RECEIVERS
-endif
-
 ifeq ($(OS), win)
 CCFLAGS += \
     -I$(SYSDIR)/pthreads \
     -I$(SYSDIR)/dcfnix \
 
+endif
+
+ifeq ($(CHECK_ILL_OBJECTS), yes)
+CCFLAGS += -DCHECK_ILL_OBJECTS
 endif
 
 OBJECTS = \
@@ -53,6 +50,6 @@ OBJECTS = \
 	sync.o \
 	toydispatch.o \
 	associations.o \
-
+	ill_object.o \
 
 include $(ROOTDIR)/module.mk
