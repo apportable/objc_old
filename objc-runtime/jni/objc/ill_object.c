@@ -6,10 +6,8 @@
 #include "dtable.h"
 #include "uthash.h"
 
-const time_t defer_timeout_seconds = 20;
+const time_t defer_timeout_seconds = 100;
 const size_t max_deferred_objects = 10000;
-const size_t min_object_size = 4;
-const size_t max_object_size = 64;
 
 typedef struct
 {
@@ -37,20 +35,18 @@ static dobject_class* non_deferrable_object_classes = NULL;
 
 static BOOL is_deferrable_object_class(Class clazz)
 {
-	// Check object size.
+	// Filter by size.
+	const size_t min_size = 0;
+	const size_t max_size = 10000;
 	size_t instance_size = class_getInstanceSize(clazz);
-	if (instance_size <= min_object_size || instance_size > max_object_size)
+	if (instance_size <= min_size || instance_size > max_size)
 	{
 		return NO;
 	}
 	
-	// Check prefix.
+	// Filter by class prefix.
 	static const char* prefixes[] = {
-		"GSMutable",
-		"GSC",
-		"UI",
-		"CG",
-		"Java",
+		// List of class name prefixes (e.g. "UI", "GSC").
 		NULL
 	};
 	const char* class_name = class_getName(clazz);
@@ -62,24 +58,12 @@ static BOOL is_deferrable_object_class(Class clazz)
 		}
 	}
 	
-	// Check specific cases.
+	// Filter by class.
 	pthread_mutex_lock(&non_deferrable_object_classes_mutex);
 	if (!non_deferrable_object_classes)
 	{
 		static const char* class_names[] = {
-			"GSAutoreleasedMemory",
-			"GSInlineArray",
-			"GSSizeValue",
-			"GSPointValue",
-			"GSValue",
-			"NSDataMalloc",
-			"NSMutableDataMalloc",
-			"NSGDate",
-			"NSMethodSignature",
-			"NSFloatNumber",
-			"NSIntNumber",
-			"NSDecimalNumber",
-			"CCTexture2D",
+			// List of class names (e.g. "NSDate", "CCTexture").
 			NULL
 		};
 		for (const char** i = class_names; *i; ++i)
@@ -90,10 +74,14 @@ static BOOL is_deferrable_object_class(Class clazz)
 		}
 	}
 	pthread_mutex_unlock(&non_deferrable_object_classes_mutex);
-		
 	dobject_class* dclass = NULL;
 	HASH_FIND_PTR(non_deferrable_object_classes, &clazz, dclass);
-	return (dclass == NULL);
+	if (dclass)
+	{
+		return NO;
+	}
+
+	return YES;
 }
 
 static void destroy_deferred_object(deferred_object* dobject)
