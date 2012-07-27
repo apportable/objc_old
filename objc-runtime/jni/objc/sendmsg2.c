@@ -11,31 +11,173 @@
 void objc_send_initialize(id object);
 
 // Removed __thread because __thread isn't supported on Windows.
-id objc_msg_sender;
+
+#ifndef NDEBUG
+#define LOG_NIL_MSG() do { \
+	const char *name = sel_getName(_cmd); \
+	if (self && strcmp(name, "release")) { \
+		DEBUG_LOG("Missing implementation of %s %s", (self == NULL || IS_ILL_OBJECT(self))? "<INVALID>" : class_getName(object_getClass(self)), name); \
+	} \
+} while(0)
+#else
+#define LOG_NIL_MSG()
+#endif
+
+// Even though the sizes of these types may be duplications, this is split out to facilitate forwarding and unforseen issues with certain return types...
 
 static id nil_method(id self, SEL _cmd, ...) {
-#ifndef NDEBUG
-  const char *name = sel_getName(_cmd);
-  if (self && strcmp(name, "release")) {
-      DEBUG_LOG("Missing implementation of %s %s", (self == NULL || IS_ILL_OBJECT(self))? "<INVALID>" : class_getName(object_getClass(self)), name);
-  }
-#endif
-  return nil;
+	LOG_NIL_MSG();
+	return nil;
 }
 
+static void nil_void_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return;
+}
 
+static BOOL nil_bool_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return NO;
+}
+
+static unsigned char nil_uchar_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0x00;
+}
+
+static char nil_char_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0x00;
+}
+
+static unsigned short nil_ushort_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0;
+}
+
+static short nil_short_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0;
+}
+
+static unsigned int nil_uint_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0;
+}
+
+static int nil_int_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0;
+}
+
+static unsigned long nil_ulong_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0UL;
+}
+
+static long nil_long_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0L;
+}
+
+static unsigned long long nil_ulonglong_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0ULL;
+}
+
+static long long nil_longlong_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0LL;
+}
+
+static double nil_double_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0.0;
+}
+
+static float nil_float_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	return 0.0f;
+}
+
+static void *nil_unknown_method(id self, SEL _cmd, ...) {
+	LOG_NIL_MSG();
+	// TODO: log here?
+	return NULL;
+}
 
 static struct objc_slot nil_slot = { Nil, Nil, "", 1, (IMP)nil_method };
 struct objc_slot forward_slot = { Nil, Nil, "", 1, (IMP)nil_method };
+struct objc_slot forward_void_slot = { Nil, Nil, "", 1, (IMP)nil_void_method };
+struct objc_slot forward_bool_slot = { Nil, Nil, "", 1, (IMP)nil_bool_method };
+struct objc_slot forward_uchar_slot = { Nil, Nil, "", 1, (IMP)nil_uchar_method };
+struct objc_slot forward_char_slot = { Nil, Nil, "", 1, (IMP)nil_char_method };
+struct objc_slot forward_ushort_slot = { Nil, Nil, "", 1, (IMP)nil_ushort_method };
+struct objc_slot forward_short_slot = { Nil, Nil, "", 1, (IMP)nil_short_method };
+struct objc_slot forward_uint_slot = { Nil, Nil, "", 1, (IMP)nil_uint_method };
+struct objc_slot forward_int_slot = { Nil, Nil, "", 1, (IMP)nil_int_method };
+struct objc_slot forward_ulong_slot = { Nil, Nil, "", 1, (IMP)nil_ulong_method };
+struct objc_slot forward_long_slot = { Nil, Nil, "", 1, (IMP)nil_long_method };
+struct objc_slot forward_ulonglong_slot = { Nil, Nil, "", 1, (IMP)nil_ulonglong_method };
+struct objc_slot forward_longlong_slot = { Nil, Nil, "", 1, (IMP)nil_longlong_method };
+struct objc_slot forward_double_slot = { Nil, Nil, "", 1, (IMP)nil_double_method };
+struct objc_slot forward_float_slot = { Nil, Nil, "", 1, (IMP)nil_float_method };
+struct objc_slot forward_unknown_slot = { Nil, Nil, "", 1, (IMP)nil_unknown_method };
 
 typedef struct objc_slot *Slot_t;
 
 Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender);
 
+static inline Slot_t lookup_nil_slot(SEL selector) {
+	const char *types = sel_getType_np(selector);
+	if (types == NULL) {
+		return &forward_unknown_slot;
+	}
+	switch (*types) {
+		case _C_BOOL:
+			return &forward_bool_slot;
+		case _C_CHR:
+			return &forward_char_slot;
+		case _C_UCHR:
+			return &forward_uchar_slot;
+		case _C_SHT:
+			return &forward_short_slot;
+		case _C_USHT:
+			return &forward_ushort_slot;
+		case _C_INT:
+			return &forward_int_slot;
+		case _C_UINT:
+			return &forward_uint_slot;
+		case _C_LNG:
+			return &forward_long_slot;
+		case _C_ULNG:
+			return &forward_ulong_slot;
+		case _C_LNG_LNG:
+			return &forward_longlong_slot;
+		case _C_ULNG_LNG:
+			return &forward_ulonglong_slot;
+		case _C_FLT:
+			return &forward_float_slot;
+		case _C_DBL:
+			return &forward_double_slot;
+		case _C_VOID:
+			return &forward_void_slot;
+		/*pointer types*/
+		case _C_ID:
+		case _C_CLASS:
+		case _C_SEL:
+			return &forward_slot;
+		/*unknown type*/
+		default:
+			return &forward_unknown_slot;
+
+	}
+}
+
 // Default implementations of the two new hooks.  Return NULL.
 static id objc_proxy_lookup_null(id receiver, SEL op) { return nil; }
-static Slot_t objc_msg_forward3_null(id receiver, SEL op) { return &nil_slot; }
-static Slot_t objc_msg_forward4_null(id receiver, SEL op) { return &forward_slot; }
+static Slot_t objc_msg_forward3_null(id receiver, SEL op) { return lookup_nil_slot(op); }
+static Slot_t objc_msg_forward4_null(id receiver, SEL op) { return lookup_nil_slot(op); }
 
 id (*objc_proxy_lookup)(id receiver, SEL op) = objc_proxy_lookup_null;
 Slot_t (*__objc_msg_forward3)(id receiver, SEL op) = objc_msg_forward3_null;
@@ -65,7 +207,7 @@ Slot_t objc_msg_lookup_internal(id *receiver,
 retry:;
 	if (CHECK_ILL_OBJECT_WHEN(*receiver, "looking up a selector %s", sel_getName(selector)))
 	{
-		return &nil_slot;
+		return lookup_nil_slot(selector);
 	}
 	Slot_t result = objc_dtable_lookup((*receiver)->isa->dtable,
 			PTR_TO_IDX(selector->name));
@@ -134,7 +276,7 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 	// inlined trivially.
 	if(*receiver == nil)
 	{
-		return &nil_slot;
+		return lookup_nil_slot(selector);
 	}
 
 	/*
@@ -163,7 +305,7 @@ Slot_t objc_slot_lookup_super(struct objc_super *super, SEL selector)
 	if (CHECK_ILL_OBJECT_WHEN(super->receiver,
 			"looking up super selector %s", sel_getName(selector)))
 	{
-		return &nil_slot;
+		return lookup_nil_slot(selector);
 	}
 	id receiver = super->receiver;
 	if (receiver)
@@ -181,7 +323,7 @@ Slot_t objc_slot_lookup_super(struct objc_super *super, SEL selector)
 	}
 	else
 	{
-		return &nil_slot;
+		return lookup_nil_slot(selector);
 	}
 }
 
