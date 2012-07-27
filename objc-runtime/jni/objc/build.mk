@@ -20,6 +20,10 @@ CCFLAGS += \
 
 endif
 
+ifeq ($(CHECK_ILL_OBJECTS), yes)
+CCFLAGS += -DCHECK_ILL_OBJECTS
+endif
+
 OBJECTS = \
 	NSBlocks.o \
 	Protocol2.o \
@@ -46,6 +50,6 @@ OBJECTS = \
 	sync.o \
 	toydispatch.o \
 	associations.o \
-
+	ill_object.o \
 
 include $(ROOTDIR)/module.mk

@@ -6,6 +6,7 @@
 #include "method_list.h"
 #include "lock.h"
 #include "dtable.h"
+#include "objc/ill_object.h"
 
 /* Make glibc export strdup() */
 
@@ -39,6 +40,21 @@ static Method class_getInstanceMethodNonrecursive(Class aClass, SEL aSelector)
 		}
 	}
 	return NULL;
+}
+
+/** 
+ * Looks up the instance method in a specific class, while recursing into
+ * superclasses.
+ */
+static Method class_getInstanceMethodRecursive(Class aClass, SEL aSelector) {
+    Class clasz = aClass;
+    while(clasz != NULL) {
+        Method method = class_getInstanceMethodNonrecursive(clasz, aSelector);
+        if(method != NULL)
+            return method;
+        clasz = aClass->super_class;
+    }
+    return NULL;
 }
 
 static void objc_updateDtableForClassContainingMethod(Method m)
@@ -269,11 +285,26 @@ id class_createInstance(Class cls, size_t extraBytes)
 	return obj;
 }
 
+/**
+ *    Parameters
+ *        aClass
+ *            The class you want to inspect.
+ *        aSelector
+ *            The selector of the method you want to retrieve.
+ *    Return Value
+ *        The method that corresponds to the implementation of the selector specified
+ *        by aSelector for the class specified by aClass, or NULL if the specified
+ *        class or its superclasses do not contain an instance method with the specified selector.
+ **/
 Method class_getInstanceMethod(Class aClass, SEL aSelector)
 {
     if(aSelector == NULL)
     {
         return NULL;
+    }
+    if (CHECK_ILL_CLASS_WHEN(aClass, "getting instance method %s", sel_getName(aSelector)))
+    {
+    	return NULL;
     }
 	// Do a dtable lookup to find out which class the method comes from.
 	struct objc_slot *slot = objc_get_slot(aClass, aSelector);
@@ -281,9 +312,9 @@ Method class_getInstanceMethod(Class aClass, SEL aSelector)
 
 	// Now find the typed variant of the selector, with the correct types.
 	aSelector = sel_registerTypedName_np(sel_getName(aSelector), slot->types);
-	
+
 	// Then do the slow lookup to find the method.
-	return class_getInstanceMethodNonrecursive(slot->owner, aSelector);
+	return class_getInstanceMethodRecursive(slot->owner, aSelector);
 }
 
 Method class_getClassMethod(Class aClass, SEL aSelector)
@@ -645,6 +676,10 @@ void *object_getIndexedIvars(id obj)
 
 Class object_getClass(id obj)
 {
+	if (CHECK_ILL_OBJECT_WHEN(obj, "inside object_getClass()"))
+	{
+		return Nil;
+	}
 	if (nil != obj)
 	{
 		Class isa = obj->isa;

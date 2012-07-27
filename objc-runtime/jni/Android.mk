@@ -19,13 +19,13 @@ ifeq ("$(BINDIR)","")
 else
     BINDIR       := $(abspath $(BINDIR) )
 endif
-ANDROID_NDK_ROOT :=/Developer/DestinyCloudFist/crystax-ndk-r7
+ANDROID_NDK_ROOT :=/Developer/DestinyCloudFist/android-ndk-r8
 ANDROID_SDK_ROOT :=/Developer/DestinyCloudFist/android-sdk-mac_x86
 TRACK_OBJC_ALLOCATIONS ?= no
 EFENCE ?= no
 
-LOCAL_ASFLAGS   := -shared -Wl,-Bsymbolic
-LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/4.4.3/ -lgnustl_shared
+LOCAL_ASFLAGS   := -shared -Wl,-Bsymbolic 
+LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/ -lgnustl_shared
 LOCAL_LDLIBS    += -Wl,--build-id
 LOCAL_MODULE    := objc
 #LOCAL_ARM_MODE  := arm
@@ -45,6 +45,10 @@ ifeq ($(BUILD), release)
     -O2 \
     -DNDEBUG \
 
+endif
+
+ifeq ($(CHECK_ILL_OBJECTS), yes)
+LOCAL_CFLAGS += -DCHECK_ILL_OBJECTS
 endif
 
 LOCAL_OBJCFLAGS += -ferror-limit=5 -fblocks -DNS_BLOCKS_AVAILABLE
@@ -76,18 +80,19 @@ LOCAL_CFLAGS    +=  \
 
 ifeq ($(TARGET_ARCH_ABI),x86)
 LOCAL_CFLAGS    +=  \
-                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-14/arch-x86/usr/include/ \
                     -nostdinc \
-                    -I/$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/i686-android-linux/4.4.3/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/i686-android-linux/4.4.3/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/$(HOST_OS)-$(HOST_ARCH)/usr/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/$(HOST_OS)-$(HOST_ARCH)/usr/include/linux/ \
 
 else
 LOCAL_CFLAGS    +=  \
-                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm/usr/include/ \
                     -nostdinc \
-                    -I/$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/arm-linux-androideabi/4.4.3/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/arm-linux-androideabi/4.4.3/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm/usr/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm/usr/include/linux/ \
 
 endif
-
 
 ifeq ($(TRACK_OBJC_ALLOCATIONS),yes)
   LOCAL_CFLAGS += \
@@ -149,6 +154,7 @@ LOCAL_SRC_FILES :=  \
                     NSBlocks.o \
                     blocks/runtime.o \
                     blocks/data.o \
+                    ill_object.o \
 
 ifeq ($(EFENCE),yes)
 LOCAL_SRC_FILES += \
@@ -168,12 +174,11 @@ LOCAL_SRC_FILES += unwind_stubs.o
 
 OBJECTS:=$(LOCAL_SRC_FILES)
 
-CXX_SYSTEM = -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/include/4.4.3/ \
-             -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/4.4.3/include/ \
-             -isystem $(ANDROID_NDK_ROOT)/sources/crystax/include \
+CXX_SYSTEM = -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/include/ \
+             -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/include/ \
 
 ifeq ($(TARGET_ARCH_ABI),x86)
-  CCLD=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-x86
+  LD=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-x86
 
   CC= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-x86 $(CXX_SYSTEM) -ccc-host-triple i686-android-linux -march=i386 -D__compiler_offsetof=__builtin_offsetof
   CPP= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-x86 $(CXX_SYSTEM)
@@ -184,7 +189,7 @@ ifeq ($(TARGET_ARCH_ABI),x86)
   AR=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-ar
 
 else
-  CCLD=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/arm-linux-androideabi-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-arm
+  LD=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/arm-linux-androideabi-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-arm
 
   CC= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm $(CXX_SYSTEM) -ccc-host-triple arm-android-eabi -march=armv5 -D__compiler_offsetof=__builtin_offsetof
   CPP= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm $(CXX_SYSTEM)
@@ -193,15 +198,15 @@ else
   AS=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/arm-linux-androideabi-as
   LDR=
   AR=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/arm-linux-androideabi-ar
-
+  
 endif
 
 OBJDIR = $(BINDIR)/$(MODULE_DST)
 # OUTPUT_OBJECTS = ${OBJECTS:%=$(OBJDIR)/%}
 
-MODULE_CFLAGS := $(COMMON_CFLAGS) $(CFLAGS) $(LOCAL_CFLAGS)
-MODULE_CCFLAGS := $(COMMON_CCFLAGS) $(CCFLAGS) $(LOCAL_CFLAGS)
-MODULE_ASFLAGS := $(COMMON_ASFLAGS) $(ASFLAGS) $(LOCAL_ASFLAGS)
+MODULE_CFLAGS := $(COMMON_CFLAGS) $(CFLAGS) $(LOCAL_CFLAGS) 
+MODULE_CCFLAGS := $(COMMON_CCFLAGS) $(CCFLAGS) $(LOCAL_CFLAGS) 
+MODULE_ASFLAGS := $(COMMON_ASFLAGS) $(ASFLAGS) $(LOCAL_ASFLAGS) 
 MODULE_OBJCFLAGS := $(COMMON_OBJCFLAGS) $(LOCAL_OBJCFLAGS)
 
 # pull in dependency info for *existing* .o files
@@ -217,27 +222,27 @@ ifneq ("$(ANALYZE)", "yes")
 $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.mm .SECONDARY
 	@echo Compiling .mm $<
 	@mkdir -p $(dir $@)
-	@$(CC) -MD -MT $@ $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S $< -o $@
+	@$(CC) -MD -MT $@ $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
 $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.cc .SECONDARY
 	@echo Compiling .cc $<
 	@mkdir -p $(dir $@)
-	@$(CC) -MD -MT $@ -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S $< -o $@
+	@$(CC) -MD -MT $@ -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
 $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.cpp .SECONDARY
 	@echo Compiling .cpp $<
 	@mkdir -p $(dir $@)
-	@$(CC) -MD -MT $@ -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S $< -o $@
+	@$(CC) -MD -MT $@ -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
 $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.c .SECONDARY
 	@echo Compiling .c $<
-	mkdir -p $(dir $@)
-	$(CC) -MD -MT $@ $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S $< -o $@
+	@mkdir -p $(dir $@)
+	@$(CC) -MD -MT $@ $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
 $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.m .SECONDARY
 	@echo Compiling .m $<
-	mkdir -p $(dir $@)
-	@$(CC) -MD -MT $@ $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S $< -o $@
+	@mkdir -p $(dir $@)
+	@$(CC) -MD -MT $@ $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
 $(OBJDIR)/%.fixed.s: $(OBJDIR)/%.out.s .SECONDARY
 	@echo fixing $<
@@ -258,32 +263,32 @@ else
 # Start Analyze Rules
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.mm
-	@echo Analyzing $<
-	@mkdir -p $(dir $@)
-	$(CC) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.cc
-	@echo Analyzing $<
-	@mkdir -p $(dir $@)
-	@$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.cpp
-	@echo Analyzing $<
-	@mkdir -p $(dir $@)
-	@$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.c
-	@echo Analyzing $<
-	@mkdir -p $(dir $@)
-	@$(CC) $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.m
-	@echo Analyzing $<
-	@mkdir -p $(dir $@)
-	@$(CC) $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+  @echo Analyzing $<
+  @mkdir -p $(dir $@)
+  @$(CC) $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.s
-	@echo Skipping analysis $<
+  @echo Skipping analysis $<
 
 # End Analyze Rules
 endif

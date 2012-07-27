@@ -52,6 +52,8 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 		__objc_init_protocol_table();
 		__objc_init_class_tables();
 		__objc_init_dispatch_tables();
+		sel_registerName(".cxx_construct");
+		sel_registerName(".cxx_destruct");
 		first_run = NO;
 	}
 
