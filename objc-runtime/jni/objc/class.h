@@ -1,6 +1,23 @@
 #ifndef __OBJC_CLASS_H_INCLUDED
 #define __OBJC_CLASS_H_INCLUDED
-#ifndef __objc_runtime_INCLUDE_GNU
+#include "visibility.h"
+
+/**
+ * Overflow bitfield.  Used for bitfields that are more than 63 bits.
+ */
+struct objc_bitfield
+{
+	/**
+	 * The number of elements in the values array.
+	 */
+	int32_t  length;
+	/**
+	 * An array of values.  Each 32 bits is stored in the native endian for the
+	 * platform.
+	 */
+	int32_t values[0];
+};
+
 struct objc_class
 {
 	/**
@@ -74,9 +91,9 @@ struct objc_class
 	 */
 	struct objc_protocol_list *protocols;
 	/**
-	 * Pointer used by the Boehm GC.
+	 * Linked list of extra data attached to this class.
 	 */
-	void                      *gc_object_type;
+	struct reference_list     *extra_data;
 	/**
 	* New ABI.  The following fields are only available with classes compiled to
 	* support the new ABI.  You may test whether any given class supports this
@@ -84,7 +101,9 @@ struct objc_class
 	*/
 
 	/**
-	* The version of the ABI used for this class.  This is currently always zero.  
+	* The version of the ABI used for this class.  Zero indicates the ABI first
+	* implemented by clang 1.0.  One indicates the presence of bitmaps
+	* indicating the offsets of strong, weak, and unretained ivars.
 	*/
 	long                       abi_version;
 
@@ -109,8 +128,51 @@ struct objc_class
 	* the accessor methods for each property.
 	*/
 	struct objc_property_list *properties;
+
+	/**
+	 * GC / ARC ABI: Fields below this point only exist if abi_version is >= 1.
+	 */
+
+	/**
+	 * The location of all strong pointer ivars declared by this class.  
+	 *
+	 * If the low bit of this field is 0, then this is a pointer to an
+	 * objc_bitfield structure.  If the low bit is 1, then the remaining 63
+	 * bits are set, from low to high, for each ivar in the object that is a
+	 * strong pointer.
+	 */
+	intptr_t                   strong_pointers;
+	/**
+	 * The location of all zeroing weak pointer ivars declared by this class.
+	 * The format of this field is the same as the format of the
+	 * strong_pointers field.
+	 */
+	intptr_t                   weak_pointers;
 };
-#endif
+
+/**
+ * Structure representing the old ABI class structure.  This is only ever
+ * required so that we can take its size - struct objc_class begins with the
+ * same fields, and you can test the new abi flag to tell whether it is safe to
+ * access the subsequent fields.
+ */
+struct legacy_abi_objc_class
+{
+	struct objc_class         *isa;
+	struct objc_class         *super_class;
+	const char                *name;
+	long                       version;
+	unsigned long              info;
+	long                       instance_size;
+	struct objc_ivar_list     *ivars;
+	struct objc_method_list   *methods;
+	void                      *dtable;
+	struct objc_class         *subclass_list;
+	struct objc_class         *sibling_class;
+	struct objc_protocol_list *protocols;
+	void                      *gc_object_type;
+};
+
 
 /**
  * An enumerated type describing all of the valid flags that may be used in the
@@ -146,40 +208,40 @@ enum objc_class_flags
 	 */
 	objc_class_flag_user_created = (1<<5),
 	/** 
-	 * Instances of this class have a reference count and plane ID prepended to
-	 * them.  The default for this is set for classes, unset for metaclasses.
-	 * It should be cleared by protocols, constant strings, and objects not
-	 * allocated by NSAllocateObject().
-	*/
-	objc_class_flag_plane_aware = (1<<6),
-	/** 
 	 * Instances of this class are provide ARC-safe retain / release /
 	 * autorelease implementations.
 	 */
-	objc_class_flag_fast_arc = (1<<7),
+	objc_class_flag_fast_arc = (1<<6),
 	/**
 	 * This class is a hidden class (should not be registered in the class
 	 * table nor returned from object_getClass()).
 	 */
-	objc_class_flag_hidden_class = (1<<8),
+	objc_class_flag_hidden_class = (1<<7),
 	/**
 	 * This class is a hidden class used to store associated values.
 	 */
-	objc_class_flag_assoc_class = (1<<9)
+	objc_class_flag_assoc_class = (1<<8)
 };
 
+/**
+ * Sets the specific class flag.  Note: This is not atomic.
+ */
 static inline void objc_set_class_flag(struct objc_class *aClass,
                                        enum objc_class_flags flag)
 {
 	aClass->info |= (unsigned long)flag;
 }
+/**
+ * Unsets the specific class flag.  Note: This is not atomic.
+ */
 static inline void objc_clear_class_flag(struct objc_class *aClass,
                                          enum objc_class_flags flag)
 {
 	aClass->info &= ~(unsigned long)flag;
 }
-static inline BOOL objc_test_class_flag(struct objc_class *aClass,
-                                        enum objc_class_flags flag) __attribute__((no_instrument_function));
+/**
+ * Checks whether a specific class flag is set.
+ */
 static inline BOOL objc_test_class_flag(struct objc_class *aClass,
                                         enum objc_class_flags flag)
 {
@@ -199,18 +261,16 @@ void class_table_insert(Class class);
  */
 extern Class SmallObjectClasses[7];
 
-static BOOL isSmallObject(id obj) __attribute__((no_instrument_function));
-
 static BOOL isSmallObject(id obj)
 {
 	uintptr_t addr = ((uintptr_t)obj);
 	return (addr & OBJC_SMALL_OBJECT_MASK) != 0;
 }
 
-__attribute__((always_inline, no_instrument_function))
+__attribute__((always_inline))
 static inline Class classForObject(id obj)
 {
-	if (__builtin_expect(isSmallObject(obj), 0))
+	if (UNLIKELY(isSmallObject(obj)))
 	{
 		if (sizeof(Class) == 4)
 		{

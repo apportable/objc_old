@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include "objc/runtime.h"
+#include "visibility.h"
 #include "loader.h"
+#include "dtable.h"
 
 #define BUFFER_TYPE struct objc_category
 #include "buffer.h"
@@ -16,10 +18,13 @@ static void register_methods(struct objc_class *cls, struct objc_method_list *l)
 	// Add the method list at the head of the list of lists.
 	l->next = cls->methods;
 	cls->methods = l;
-	// Update the dtable to catch the new methods.
-	// FIXME: We can make this more efficient by simply passing the new method
-	// list to the dtable and telling it only to update those methods.
-	objc_update_dtable_for_class(cls);
+	// Update the dtable to catch the new methods, if the dtable has been
+	// created (don't bother creating dtables for classes when categories are
+	// loaded if the class hasn't received any messages yet.
+	if (classHasDtable(cls))
+	{
+		add_method_list_to_class(cls, l);
+	}
 }
 
 static void load_category(struct objc_category *cat, struct objc_class *class)
@@ -53,7 +58,7 @@ static BOOL try_load_category(struct objc_category *cat)
  * Attaches a category to its class, if the class is already loaded.  Buffers
  * it for future resolution if not.
  */
-void objc_try_load_category(struct objc_category *cat)
+PRIVATE void objc_try_load_category(struct objc_category *cat)
 {
 	if (!try_load_category(cat))
 	{
@@ -61,7 +66,7 @@ void objc_try_load_category(struct objc_category *cat)
 	}
 }
 
-void objc_load_buffered_categories(void)
+PRIVATE void objc_load_buffered_categories(void)
 {
 	BOOL shouldReshuffle = NO;
 

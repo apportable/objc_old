@@ -28,9 +28,9 @@ static int protocol_hash(const struct objc_protocol2 *protocol)
 
 static protocol_table *known_protocol_table;
 
-void __objc_init_protocol_table(void)
+void init_protocol_table(void)
 {
-	known_protocol_table = protocol_create(128);
+	protocol_initialize(&known_protocol_table, 128);
 }  
 
 static void protocol_table_insert(const struct objc_protocol2 *protocol)
@@ -59,8 +59,8 @@ static int isEmptyProtocol(struct objc_protocol2 *aProto)
 		struct objc_protocol2 *p2 = (struct objc_protocol2*)aProto;
 		isEmpty &= (p2->optional_instance_methods->count == 0);
 		isEmpty &= (p2->optional_class_methods->count == 0);
-		isEmpty &= (p2->properties->count == 0);
-		isEmpty &= (p2->optional_properties->count == 0);
+		isEmpty &= (p2->properties == 0) || (p2->properties->count == 0);
+		isEmpty &= (p2->optional_properties == 0) || (p2->optional_properties->count == 0);
 	}
 	return isEmpty;
 }
@@ -191,7 +191,7 @@ static BOOL init_protocols(struct objc_protocol_list *protocols)
 	return YES;
 }
 
-void objc_init_protocols(struct objc_protocol_list *protocols)
+PRIVATE void objc_init_protocols(struct objc_protocol_list *protocols)
 {
 	if (!init_protocols(protocols))
 	{
@@ -248,7 +248,7 @@ BOOL protocol_conformsToProtocol(Protocol *p1, Protocol *p2)
 BOOL class_conformsToProtocol(Class cls, Protocol *protocol)
 {
 	if (Nil == cls || NULL == protocol) { return NO; }
-	while (cls)
+	for ( ; Nil != cls ; cls = class_getSuperclass(cls))
 	{
 		for (struct objc_protocol_list *protocols = cls->protocols;
 			protocols != NULL ; protocols = protocols->next)
@@ -262,7 +262,6 @@ BOOL class_conformsToProtocol(Class cls, Protocol *protocol)
 				}
 			}
 		}
-		cls = cls->super_class;
 	}
 	return NO;
 }
@@ -329,7 +328,7 @@ struct objc_method_description *protocol_copyMethodDescriptionList(Protocol *p,
 	return out;
 }
 
-Protocol **protocol_copyProtocolList(Protocol *p, unsigned int *count)
+Protocol*__unsafe_unretained* protocol_copyProtocolList(Protocol *p, unsigned int *count)
 {
 	if (NULL == p) { return NULL; }
 	*count = 0;
@@ -472,5 +471,146 @@ BOOL protocol_isEqual(Protocol *p, Protocol *other)
 		return YES;
 	}
 	return NO;
+}
+
+Protocol*__unsafe_unretained* objc_copyProtocolList(unsigned int *outCount)
+{
+	unsigned int total = known_protocol_table->table_used;
+	Protocol **p = calloc(sizeof(Protocol*), known_protocol_table->table_used);
+
+	struct protocol_table_enumerator *e = NULL;
+	Protocol *next;
+
+	unsigned int count = 0;
+	while ((count < total) && (next = protocol_next(known_protocol_table, &e)))
+	{
+		p[count++] = next;
+	}
+	if (NULL != outCount)
+	{
+		*outCount = total;
+	}
+	return p;
+}
+
+
+Protocol *objc_allocateProtocol(const char *name)
+{
+	if (objc_getProtocol(name) != NULL) { return NULL; }
+	Protocol *p = calloc(1, sizeof(Protocol2));
+	p->name = strdup(name);
+	return p;
+}
+void objc_registerProtocol(Protocol *proto)
+{
+	if (NULL == proto) { return; }
+	LOCK_RUNTIME_FOR_SCOPE();
+	if (objc_getProtocol(proto->name) != NULL) { return; }
+	if (nil != proto->isa) { return; }
+	proto->isa = ObjC2ProtocolClass;
+	protocol_table_insert((struct objc_protocol2*)proto);
+}
+void protocol_addMethodDescription(Protocol *aProtocol,
+                                   SEL name,
+                                   const char *types,
+                                   BOOL isRequiredMethod,
+                                   BOOL isInstanceMethod)
+{
+	if ((NULL == aProtocol) || (NULL == name) || (NULL == types)) { return; }
+	if (nil != aProtocol->isa) { return; }
+	Protocol2 *proto = (Protocol2*)aProtocol;
+	struct objc_method_description_list **listPtr;
+	if (isInstanceMethod)
+	{
+		if (isRequiredMethod)
+		{
+			listPtr = &proto->instance_methods;
+		}
+		else
+		{
+			listPtr = &proto->optional_instance_methods;
+		}
+	}
+	else
+	{
+		if (isRequiredMethod)
+		{
+			listPtr = &proto->class_methods;
+		}
+		else
+		{
+			listPtr = &proto->optional_class_methods;
+		}
+	}
+	if (NULL == *listPtr)
+	{
+		*listPtr = calloc(1, sizeof(struct objc_method_description_list) + sizeof(struct objc_method_description));
+		(*listPtr)->count = 1;
+	}
+	else
+	{
+		(*listPtr)->count++;
+		*listPtr = realloc(*listPtr, sizeof(struct objc_method_description_list) +
+				sizeof(struct objc_method_description) * (*listPtr)->count);
+	}
+	struct objc_method_description_list *list = *listPtr;
+	int index = list->count-1;
+	list->methods[index].name = sel_getName(name);
+	list->methods[index].types= types;
+}
+void protocol_addProtocol(Protocol *aProtocol, Protocol *addition)
+{
+	if ((NULL == aProtocol) || (NULL == addition)) { return; }
+	Protocol2 *proto = (Protocol2*)aProtocol;
+	if (NULL == proto->protocol_list)
+	{
+		proto->protocol_list = calloc(1, sizeof(struct objc_property_list) + sizeof(Protocol2*));
+		proto->protocol_list->count = 1;
+	}
+	else
+	{
+		proto->protocol_list->count++;
+		proto->protocol_list = realloc(proto->protocol_list, sizeof(struct objc_property_list) +
+				proto->protocol_list->count * sizeof(Protocol2*));
+		proto->protocol_list->count = 1;
+	}
+	proto->protocol_list->list[proto->protocol_list->count-1] = (Protocol2*)addition;
+}
+void protocol_addProperty(Protocol *aProtocol,
+                          const char *name,
+                          const objc_property_attribute_t *attributes,
+                          unsigned int attributeCount,
+                          BOOL isRequiredProperty,
+                          BOOL isInstanceProperty)
+{
+	if ((NULL == aProtocol) || (NULL == name)) { return; }
+	if (nil != aProtocol->isa) { return; }
+	if (!isInstanceProperty) { return; }
+	Protocol2 *proto = (Protocol2*)aProtocol;
+	struct objc_property_list **listPtr;
+	if (isRequiredProperty)
+	{
+		listPtr = &proto->properties;
+	}
+	else
+	{
+		listPtr = &proto->optional_properties;
+	}
+	if (NULL == *listPtr)
+	{
+		*listPtr = calloc(1, sizeof(struct objc_property_list) + sizeof(struct objc_property));
+		(*listPtr)->count = 1;
+	}
+	else
+	{
+		(*listPtr)->count++;
+		*listPtr = realloc(*listPtr, sizeof(struct objc_property_list) +
+				sizeof(struct objc_property) * (*listPtr)->count);
+	}
+	struct objc_property_list *list = *listPtr;
+	int index = list->count-1;
+	struct objc_property p = propertyFromAttrs(attributes, attributeCount);
+	p.name = strdup(name);
+	memcpy(&(list->properties[index]), &p, sizeof(p));
 }
 
