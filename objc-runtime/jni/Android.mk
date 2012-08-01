@@ -105,7 +105,7 @@ ifeq ($(TARGET_ARCH_ABI),armeabi-v7a)
   LOCAL_CFLAGS += \
       -mfloat-abi=softfp
       -march=armv7-a \
-      -mfpu=vfp \
+      -mfpu=neon \
 
   MODULE_ASFLAGS += \
       -mfloat-abi=softfp
