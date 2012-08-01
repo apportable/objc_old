@@ -206,8 +206,6 @@ void objc_sync_nil()
 // Returns OBJC_SYNC_SUCCESS once lock is acquired.  
 int objc_sync_enter(id obj)
 {
-    pthread_mutex_lock(&sDataList->mutex);
-    return OBJC_SYNC_SUCCESS;
     if (obj == NULL)
     {
         DEBUG_LOG("NIL SYNC DEBUG: @synchronized(nil); set a breakpoint on objc_sync_nil to debug");
@@ -226,7 +224,7 @@ int objc_sync_enter(id obj)
     result = pthread_mutex_lock(&data->mutex);
     require_noerr_string(result, done, "pthread_mutex_lock failed");
     data->lockCount++;	// note: lockCount is only modified when corresponding mutex is held
-	
+
 done: 
     return result;
 }
@@ -236,8 +234,6 @@ done:
 // Returns OBJC_SYNC_SUCCESS or OBJC_SYNC_NOT_OWNING_THREAD_ERROR
 int objc_sync_exit(id obj)
 {
-    pthread_mutex_unlock(&sDataList->mutex);
-    return OBJC_SYNC_SUCCESS;
     if (obj == NULL)
     {
         DEBUG_LOG("NIL SYNC DEBUG: @synchronized(nil); set a breakpoint on objc_sync_nil to debug");
@@ -246,7 +242,7 @@ int objc_sync_exit(id obj)
     }
 
     int result = OBJC_SYNC_SUCCESS;
-    
+
     SyncData* data;
     data = id2data(obj); // XXX should assert that we didn't create it
     require_action_string(data != NULL, done, result = OBJC_SYNC_NOT_INITIALIZED, "id2data failed");
@@ -271,7 +267,7 @@ int objc_sync_exit(id obj)
 
     result = pthread_mutex_unlock(&data->mutex);
     require_noerr_string(result, done, "pthread_mutex_unlock failed");
-	
+
 done:
     if ( result == EPERM )
         result = OBJC_SYNC_NOT_OWNING_THREAD_ERROR;
