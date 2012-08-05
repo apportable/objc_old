@@ -1,7 +1,19 @@
-import os
-Import('env')
+flags = [
 
-deps = []
+]
+
+defines = {
+    'MAP_TABLE_SINGLE_THREAD' : 1,
+    'MAP_TABLE_NO_LOCK' : 1,
+}
+
+header_paths = [
+
+]
+
+deps = [
+
+]
 
 sources = [
     'objc-runtime/jni/objc/Protocol2.m',
@@ -33,10 +45,6 @@ sources = [
     'objc-runtime/jni/objc/unwind_stubs.m',
 ]
 
-env.Append(CPPDEFINES = {
-    'MAP_TABLE_SINGLE_THREAD' : 1,
-    'MAP_TABLE_NO_LOCK' : 1,
-})
-
-BuildLibrary(env, sources, static=False)
+Import('env')
+BuildLibrary(env, sources = sources, header_paths = header_paths, static=False, defines = defines, flags = flags)
 Return('deps')
