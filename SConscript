@@ -30,7 +30,13 @@ sources = [
     'objc-runtime/jni/objc/blocks/runtime.c',
     'objc-runtime/jni/objc/blocks/data.c',
     'objc-runtime/jni/objc/ill_object.c',
+    'objc-runtime/jni/objc/unwind_stubs.m',
 ]
 
-BuildLibrary(env, sources)
+env.Append(CPPDEFINES = {
+    'MAP_TABLE_SINGLE_THREAD' : 1,
+    'MAP_TABLE_NO_LOCK' : 1,
+})
+
+BuildLibrary(env, sources, static=False)
 Return('deps')

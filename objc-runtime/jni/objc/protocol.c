@@ -171,7 +171,6 @@ static BOOL init_protocols(struct objc_protocol_list *protocols)
 		switch (version)
 		{
 			default:
-				fprintf(stderr, "Unknown protocol version");
 				abort();
 			case protocol_version_legacy:
 				aProto->isa = protocol_class;

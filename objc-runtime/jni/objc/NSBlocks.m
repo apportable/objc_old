@@ -38,9 +38,7 @@ static void *_NSBlockRetain(void *src, SEL _cmd) {
 }
 
 static id _NSBlockDescription(void *src, SEL _cmd) {
-	
-	const char *description = _Block_dump(src);
-	// return [[[NSString alloc] initWithUTF8String:description] autorelease];
+	const char *description = "Block";
 	static Class NSStringClass = NULL;
 	static IMP NSStringAlloc = NULL;
 	static IMP NSStringInitWithUTF8String = NULL;

@@ -323,7 +323,6 @@ static int PREFIX(_insert)(PREFIX(_table) *table,
 		MAP_UNLOCK();
 		return PREFIX(_insert)(table, value);
 	}
-	fprintf(stderr, "Insert failed\n");
 	MAP_UNLOCK();
 	return 0;
 }
@@ -534,13 +533,6 @@ PREFIX(_current)(PREFIX(_table) *table,
 #	undef MAP_UNLOCK
 #else
 #	undef MAP_TABLE_NO_LOCK
-#endif
-
-#if !defined(APPORTABLE)
-// TODO(jackson): Understand what this is and why we want it
-#ifdef MAP_TABLE_SINGLE_THREAD
-#	undef MAP_TABLE_SINGLE_THREAD
-#endif
 #endif
 
 #undef MAP_TABLE_VALUE_NULL

@@ -353,6 +353,7 @@ struct profile_info
 
 static void __objc_profile_init(void)
 {
+#if 0
 	INIT_LOCK(profileLock);
 	profileSymbols = fopen("objc_profile.symbols", "a");
 	profileData = fopen("objc_profile.data", "a");
@@ -360,10 +361,12 @@ static void __objc_profile_init(void)
 	fprintf(profileSymbols, "=== NEW TRACE ===\n");
 	struct profile_info profile_data = { 0, 0, 0 };
 	fwrite(&profile_data, sizeof(profile_data), 1, profileData);
+#endif
 }
 
 void objc_profile_write_symbols(char **symbols)
 {
+#if 0
 	if (NULL == profileData)
 	{
 		LOCK(__objc_runtime_mutex);
@@ -382,6 +385,7 @@ void objc_profile_write_symbols(char **symbols)
 	}
 	UNLOCK(&profileLock);
 	fflush(profileSymbols);
+#endif
 }
 
 /**
@@ -394,6 +398,7 @@ void objc_profile_write_symbols(char **symbols)
 void objc_msg_profile(id receiver, IMP method,
                       const char *module, int32_t callsite)
 {
+#if 0
 	// Initialize the logging lazily.  This prevents us from wasting any memory
 	// when we are not profiling.
 	if (NULL == profileData)
@@ -407,6 +412,7 @@ void objc_msg_profile(id receiver, IMP method,
 	}
 	struct profile_info profile_data = { module, callsite, method };
 	fwrite(&profile_data, sizeof(profile_data), 1, profileData);
+#endif
 }
 
 /**
@@ -505,6 +511,5 @@ IMP objc_msg_lookup_super(struct objc_super *super, SEL selector)
  */
 void *objc_msg_sendv(void)
 {
-	fprintf(stderr, "objc_msg_sendv() never worked correctly.  Don't use it.\n");
 	abort();
 }

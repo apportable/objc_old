@@ -27,7 +27,6 @@ static void collectMethodsForMethodListToSparseArray(
 	}
 	for (unsigned i=0 ; i<list->count ; i++)
 	{
-		//fprintf(stderr, "Adding method %s (%d)\n", sel_getName(list->methods[i].selector), PTR_TO_IDX(list->methods[i].selector->name));
 		SparseArrayInsert(sarray, PTR_TO_IDX(list->methods[i].selector->name),
 				(void*)&list->methods[i]);
 	}
@@ -64,13 +63,7 @@ Class class_getSuperclass(Class);
 
 void __objc_update_dispatch_table_for_class(Class cls)
 {
-	static BOOL warned = NO;
-	if (!warned)
-	{
-		fprintf(stderr, 
-			"Warning: Calling deprecated private ObjC runtime function %s\n", __func__);
-		warned = YES;
-	}
+
 }
 
 static dtable_t create_dtable_for_class(Class class)
@@ -416,13 +409,6 @@ void objc_update_dtable_for_class(Class cls)
 }
 void __objc_update_dispatch_table_for_class(Class cls)
 {
-	static BOOL warned = NO;
-	if (!warned)
-	{
-		fprintf(stderr, 
-			"Warning: Calling deprecated private ObjC runtime function %s\n", __func__);
-		warned = YES;
-	}
 	objc_update_dtable_for_class(cls);
 }
 
