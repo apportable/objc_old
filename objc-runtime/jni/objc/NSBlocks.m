@@ -5,6 +5,11 @@
 #import "dtable.h"
 #include <assert.h>
 
+extern void *_Block_copy(const void *aBlock);
+extern void *_Block_retain(const void *aBlock);
+extern void _Block_release(const void *aBlock);
+
+
 static struct objc_class __NSBlock;
 
 static struct objc_class *_NSBlock = &__NSBlock;
