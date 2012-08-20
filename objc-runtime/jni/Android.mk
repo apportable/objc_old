@@ -19,13 +19,59 @@ ifeq ("$(BINDIR)","")
 else
     BINDIR       := $(abspath $(BINDIR) )
 endif
+
+ifeq ($(ANDROID_NDK_R8B),yes)
+ANDROID_NDK_ROOT ?=/Developer/DestinyCloudFist/android-ndk-r8b
+ifeq ($(TARGET_ARCH_ABI),armeabi-7a)
+TARGET_TRIPLE 	 := arm-linux-androideabi
+ANDROID_ARCH_DIR := arch-arm
+GCC_INC_DIR		 := arm-linux-androideabi/4.6.x-google/include
+GCC_LIB_DIR 	 := arm-linux-androideabi/4.6.x-google/armv7-a
+ARCH_FLAGS 		 := -ccc-host-triple arm-android-eabi-v7a -march=armv7-a
+else 
+ifeq ($(TARGET_ARCH_ABI),armeabi)
+TARGET_TRIPLE 	 := arm-linux-androideabi
+ANDROID_ARCH_DIR := arch-arm
+GCC_INC_DIR 	 := arm-linux-androideabi/4.6.x-google/include
+GCC_LIB_DIR 	 := arm-linux-androideabi/4.6.x-google
+ARCH_FLAGS 		 := -ccc-host-triple arm-android-eabi -march=armv5
+else
+TARGET_TRIPLE 	 := i686-linux-android
+ANDROID_ARCH_DIR := arch-x86
+GCC_INC_DIR 	 := i686-linux-android/4.6.x-google/include
+GCC_LIB_DIR 	 := i686-linux-android/4.6.x-google
+ARCH_FLAGS 		 := -ccc-host-triple i686-android-linux -march=i686
+endif
+endif
+LIBCPP_VERSION 	 ?= /4.6
+TOOLCHAIN_TARGET_VERSION ?= arm-linux-androideabi-4.6
+LEGACY_GCC_VERSION := 
+else
 ANDROID_NDK_ROOT :=/Developer/DestinyCloudFist/android-ndk-r8
+ifeq ($(TARGET_ARCH_ABI),armeabi-7a)
+TARGET_TRIPLE 	 := arm-linux-androideabi
+ANDROID_ARCH_DIR := arch-arm
+GCC_INC_DIR		 := arm-linux-androideabi/4.4.3/include
+GCC_LIB_DIR		 := arm-linux-androideabi/4.4.3/armv7-a
+ARCH_FLAGS 		 := -ccc-host-triple arm-android-eabi-v7a -march=armv7-a
+else
+TARGET_TRIPLE 	 := arm-linux-androideabi
+ANDROID_ARCH_DIR := arch-arm
+GCC_INC_DIR		 := arm-linux-androideabi/4.4.3/include
+GCC_LIB_DIR 	 := arm-linux-androideabi/4.4.3
+ARCH_FLAGS 		 := -ccc-host-triple arm-android-eabi -march=armv5
+endif
+LIBCPP_VERSION :=
+TOOLCHAIN_TARGET_VERSION := arm-linux-androideabi-4.4.3
+LEGACY_GCC_VERSION := /4.4.3
+endif
 ANDROID_SDK_ROOT :=/Developer/DestinyCloudFist/android-sdk-mac_x86
+
 TRACK_OBJC_ALLOCATIONS ?= no
 EFENCE ?= no
 
 LOCAL_ASFLAGS   := -shared -Wl,-Bsymbolic 
-LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/ -lgnustl_shared
+LOCAL_LDLIBS    := -llog -L$(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++$(LIBCPP_VERSION)/libs/$(TARGET_ARCH_ABI)/ -lgnustl_shared
 LOCAL_LDLIBS    += -Wl,--build-id
 LOCAL_MODULE    := objc
 #LOCAL_ARM_MODE  := arm
@@ -51,7 +97,10 @@ ifeq ($(CHECK_ILL_OBJECTS), yes)
 LOCAL_CFLAGS += -DCHECK_ILL_OBJECTS
 endif
 
-LOCAL_OBJCFLAGS += -ferror-limit=5 -fblocks -DNS_BLOCKS_AVAILABLE
+LOCAL_OBJCFLAGS += -ferror-limit=5 -fblocks -DNS_BLOCKS_AVAILABLE \
+                   -ObjC \
+                   -fobjc-abi-version=3 \
+                   -fgnu-runtime
 
 
 LOCAL_CFLAGS    +=  \
@@ -66,8 +115,6 @@ LOCAL_CFLAGS    +=  \
                     -funwind-tables \
                     -fstack-protector \
                     -fno-short-enums \
-                    -fobjc-nonfragile-abi \
-                    -fobjc-nonfragile-abi-version=2 \
                     -DHAVE_GCC_VISIBILITY \
                     -g \
                     -fpic \
@@ -78,21 +125,13 @@ LOCAL_CFLAGS    +=  \
                     -D__ANDROID__  \
                     -DAPPORTABLE \
 
-ifeq ($(TARGET_ARCH_ABI),x86)
+
 LOCAL_CFLAGS    +=  \
                     -nostdinc \
-                    -isystem $(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/i686-android-linux/4.4.3/include/ \
-                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/$(HOST_OS)-$(HOST_ARCH)/usr/include/ \
-                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/$(HOST_OS)-$(HOST_ARCH)/usr/include/linux/ \
+                    -isystem $(ANDROID_NDK_ROOT)/toolchains/$(TOOLCHAIN_TARGET_VERSION)/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/$(GCC_INC_DIR) \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/$(ANDROID_ARCH_DIR)/usr/include/ \
+                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/$(ANDROID_ARCH_DIR)/usr/include/linux/ \
 
-else
-LOCAL_CFLAGS    +=  \
-                    -nostdinc \
-                    -isystem $(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/lib/gcc/arm-linux-androideabi/4.4.3/include/ \
-                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm/usr/include/ \
-                    -isystem $(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm/usr/include/linux/ \
-
-endif
 
 ifeq ($(TRACK_OBJC_ALLOCATIONS),yes)
   LOCAL_CFLAGS += \
@@ -174,32 +213,18 @@ LOCAL_SRC_FILES += unwind_stubs.o
 
 OBJECTS:=$(LOCAL_SRC_FILES)
 
-CXX_SYSTEM = -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/include/ \
-             -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/include/ \
+CXX_SYSTEM = -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++$(LIBCPP_VERSION)/include/ \
+             -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++$(LIBCPP_VERSION)/libs/$(TARGET_ARCH_ABI)/include/ \
 
-ifeq ($(TARGET_ARCH_ABI),x86)
-  LD=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-x86
+CCLD=$(ANDROID_NDK_ROOT)/toolchains/$(TOOLCHAIN_TARGET_VERSION)/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/$(TARGET_TRIPLE)-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/$(ANDROID_ARCH_DIR)
 
-  CC= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-x86 $(CXX_SYSTEM) -ccc-host-triple i686-android-linux -march=i386 -D__compiler_offsetof=__builtin_offsetof
-  CPP= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-x86 $(CXX_SYSTEM)
+CC= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/$(ANDROID_ARCH_DIR) $(CXX_SYSTEM) $(ARCH_FLAGS) -D__compiler_offsetof=__builtin_offsetof
+CPP= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/$(ANDROID_ARCH_DIR) $(CXX_SYSTEM)
 
-  CCAS=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-gcc
-  AS=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-as
-  LDR=
-  AR=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-ar
-
-else
-  LD=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/arm-linux-androideabi-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-arm
-
-  CC= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm $(CXX_SYSTEM) -ccc-host-triple arm-android-eabi -march=armv5 -D__compiler_offsetof=__builtin_offsetof
-  CPP= /Developer/DestinyCloudFist/clang-$(CLANG_VERSION)/bin/clang --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-8/arch-arm $(CXX_SYSTEM)
-
-  CCAS=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/arm-linux-androideabi-gcc
-  AS=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/arm-linux-androideabi-as
-  LDR=
-  AR=$(ANDROID_NDK_ROOT)/toolchains/arm-linux-androideabi-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/arm-linux-androideabi-ar
-  
-endif
+CCAS=$(ANDROID_NDK_ROOT)/toolchains/$(TOOLCHAIN_TARGET_VERSION)/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/$(TARGET_TRIPLE)-gcc
+AS=$(ANDROID_NDK_ROOT)/toolchains/$(TOOLCHAIN_TARGET_VERSION)/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/$(TARGET_TRIPLE)-as
+LDR=
+AR=$(ANDROID_NDK_ROOT)/toolchains/$(TOOLCHAIN_TARGET_VERSION)/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/$(TARGET_TRIPLE)-ar
 
 OBJDIR = $(BINDIR)/$(MODULE_DST)
 # OUTPUT_OBJECTS = ${OBJECTS:%=$(OBJDIR)/%}
