@@ -46,5 +46,4 @@ sources = [
 ]
 
 Import('env')
-BuildLibrary(env, sources = sources, header_paths = header_paths, static=False, defines = defines, flags = flags)
-Return('deps')
+BuildLibrary(env, sources = sources, header_paths = header_paths, static=False, defines = defines, flags = flags, deps = deps)
