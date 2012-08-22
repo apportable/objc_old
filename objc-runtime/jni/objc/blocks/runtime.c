@@ -336,20 +336,20 @@ static void *_Block_copy_internal(const void *arg, const int flags) {
     else {
         // Under GC want allocation with refcount 1 so we ask for "true" if wantsOne
         // This allows the copy helper routines to make non-refcounted block copies under GC
-        unsigned long int flags = aBlock->flags;
+        unsigned long int blockFlags = aBlock->flags;
         bool hasCTOR = (flags & BLOCK_HAS_CTOR) != 0;
         struct Block_layout *result = _Block_allocator(aBlock->descriptor->size, wantsOne, hasCTOR);
         if (!result) return (void *)0;
         memmove(result, aBlock, aBlock->descriptor->size); // bitcopy first
         // reset refcount
         // if we copy a malloc block to a GC block then we need to clear NEEDS_FREE.
-        flags &= ~(BLOCK_NEEDS_FREE|BLOCK_REFCOUNT_MASK);   // XXX not needed
+        blockFlags &= ~(BLOCK_NEEDS_FREE|BLOCK_REFCOUNT_MASK);   // XXX not needed
         if (wantsOne)
-            flags |= BLOCK_IS_GC | 1;
+            blockFlags |= BLOCK_IS_GC | 1;
         else
-            flags |= BLOCK_IS_GC;
-        result->flags = flags;
-        if (flags & BLOCK_HAS_COPY_DISPOSE) {
+            blockFlags |= BLOCK_IS_GC;
+        result->flags = blockFlags;
+        if (blockFlags & BLOCK_HAS_COPY_DISPOSE) {
             //printf("calling block copy helper...\n");
             (*aBlock->descriptor->copy)(result, aBlock); // do fixup
         }
