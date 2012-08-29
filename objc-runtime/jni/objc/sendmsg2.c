@@ -274,7 +274,7 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 	// Returning a nil slot allows the caller to cache the lookup for nil too,
 	// although this is not particularly useful because the nil method can be
 	// inlined trivially.
-	if(*receiver == nil)
+	if(*receiver == nil || (*receiver)->isa == 0)
 	{
 		return lookup_nil_slot(selector);
 	}
