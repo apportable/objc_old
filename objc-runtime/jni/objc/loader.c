@@ -3,19 +3,26 @@
 #include "objc/runtime.h"
 #include "lock.h"
 #include "loader.h"
-#include "magic_objects.h"
+#include "visibility.h"
+#ifdef ENABLE_GC
+#include <gc/gc.h>
+#endif
+#include <stdio.h>
 
 /**
  * Runtime lock.  This is exposed in 
  */
-static mutex_t objc_runtime_mutex;
-void *__objc_runtime_mutex = &objc_runtime_mutex;
+PRIVATE mutex_t runtime_mutex;
+LEGACY void *__objc_runtime_mutex = &runtime_mutex;
 
-void __objc_sync_init(void);
-void __objc_init_selector_tables(void);
-void __objc_init_protocol_table(void);
-void __objc_init_class_tables(void);
-void __objc_init_dispatch_tables(void);
+void init_alias_table(void);
+void init_arc(void);
+void init_class_tables(void);
+void init_dispatch_tables(void);
+void init_gc(void);
+void init_protocol_table(void);
+void init_selector_tables(void);
+void init_trampolines(void);
 void objc_send_load_message(Class class);
 
 /* Number of threads that are alive.  */
@@ -28,10 +35,13 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 	// Check that this module uses an ABI version that we recognise.  
 	// In future, we should pass the ABI version to the class / category load
 	// functions so that we can change various structures more easily.
-	assert(objc_check_abi_version(module->version, module->size));
+	assert(objc_check_abi_version(module));
 
 	if (first_run)
 	{
+#if ENABLE_GC
+		init_gc();
+#endif
 		// Create the main runtime lock.  This is not safe in theory, but in
 		// practice the first time that this function is called will be in the
 		// loader, from the main thread.  Future loaders may run concurrently,
@@ -42,21 +52,21 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 		// pure-C main() function spawns two threads which then, concurrently,
 		// call dlopen() or equivalent, and the platform's implementation of
 		// this does not perform any synchronization.
-		INIT_LOCK(objc_runtime_mutex);
-		
+		INIT_LOCK(runtime_mutex);
 		// Create the various tables that the runtime needs.
-		__objc_init_selector_tables();
-		__objc_init_protocol_table();
-		__objc_init_class_tables();
-		__objc_init_dispatch_tables();
-		sel_registerName(".cxx_construct");
-		sel_registerName(".cxx_destruct");
+		init_selector_tables();
+		init_protocol_table();
+		init_class_tables();
+		init_dispatch_tables();
+		init_alias_table();
+		init_arc();
+		init_trampolines();
 		first_run = NO;
 	}
 
 	// The runtime mutex is held for the entire duration of a load.  It does
 	// not need to be acquired or released in any of the called load functions.
-	LOCK_UNTIL_RETURN(__objc_runtime_mutex);
+	LOCK_RUNTIME_FOR_SCOPE();
 
 	struct objc_symbol_table_abi_8 *symbols = module->symbol_table;
 	// Register all of the selectors used in this module.

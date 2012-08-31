@@ -21,6 +21,20 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+
+#ifdef ENABLE_GC
+#	include <gc/gc.h>
+#	include <gc/gc_typed.h>
+#	define CALLOC(x,y) GC_MALLOC(x*y)
+#	define IF_NO_GC(x)
+#	define IF_GC(x) x
+#else
+#	define CALLOC(x,y) calloc(x,y)
+#	define IF_NO_GC(x) x
+#	define IF_GC(x)
+#endif
 
 #ifndef MAP_TABLE_NAME
 #	error You must define MAP_TABLE_NAME.
@@ -62,6 +76,7 @@ static BOOL PREFIX(_is_null)(void *value)
 {
 	return value == NULL;
 }
+#	define MAP_TABLE_TYPES_BITMAP 1
 #	define MAP_TABLE_VALUE_NULL PREFIX(_is_null)
 #	define MAP_TABLE_VALUE_PLACEHOLDER NULL
 #endif
@@ -77,7 +92,7 @@ typedef struct
 {
 	mutex_t lock;
 	unsigned int table_used;
-	unsigned int enumerator_count;
+	IF_NO_GC(unsigned int enumerator_count;)
 	struct PREFIX(_table_cell_struct) table[MAP_TABLE_STATIC_SIZE];
 } PREFIX(_table);
 static PREFIX(_table) MAP_TABLE_STATIC_NAME;
@@ -94,26 +109,52 @@ typedef struct PREFIX(_table_struct)
 	mutex_t lock;
 	unsigned int table_size;
 	unsigned int table_used;
-	unsigned int enumerator_count;
+	IF_NO_GC(unsigned int enumerator_count;)
+#	if defined(ENABLE_GC) && defined(MAP_TABLE_TYPES_BITMAP)
+	GC_descr descr;
+#	endif 
 	struct PREFIX(_table_struct) *old;
 	struct PREFIX(_table_cell_struct) *table;
 } PREFIX(_table);
 
+struct PREFIX(_table_cell_struct) *PREFIX(alloc_cells)(PREFIX(_table) *table, int count)
+{
+#	if defined(ENABLE_GC) && defined(MAP_TABLE_TYPES_BITMAP)
+	return GC_CALLOC_EXPLICITLY_TYPED(count,
+			sizeof(struct PREFIX(_table_cell_struct)), table->descr);
+#	else
+	return CALLOC(count, sizeof(struct PREFIX(_table_cell_struct)));
+#	endif
+}
+
 PREFIX(_table) *PREFIX(_create)(uint32_t capacity)
 {
-	PREFIX(_table) *table = calloc(1, sizeof(PREFIX(_table)));
+	PREFIX(_table) *table = CALLOC(1, sizeof(PREFIX(_table)));
 #	ifndef MAP_TABLE_NO_LOCK
 	INIT_LOCK(table->lock);
 #	endif
-	table->table = calloc(capacity, sizeof(struct PREFIX(_table_cell_struct)));
+#	if defined(ENABLE_GC) && defined(MAP_TABLE_TYPES_BITMAP)
+	// The low word in the bitmap stores the offsets of the next entries
+	GC_word bitmap = (MAP_TABLE_TYPES_BITMAP << 1);
+	table->descr = GC_make_descriptor(&bitmap,
+			sizeof(struct PREFIX(_table_cell_struct)) / sizeof (void*));
+#	endif
+	table->table = PREFIX(alloc_cells)(table, capacity);
 	table->table_size = capacity;
 	return table;
 }
+
+void PREFIX(_initialize)(PREFIX(_table) **table, uint32_t capacity)
+{
+#ifdef ENABLE_GC
+	GC_add_roots(table, table+1);
+#endif
+	*table = PREFIX(_create)(capacity);
+}
+
 #	define TABLE_SIZE(x) (x->table_size)
 #endif
 
-// Collects garbage in the background
-void objc_collect_garbage_data(void(*)(void*), void*);
 
 #ifdef MAP_TABLE_STATIC_SIZE
 static int PREFIX(_table_resize)(PREFIX(_table) *table)
@@ -122,53 +163,17 @@ static int PREFIX(_table_resize)(PREFIX(_table) *table)
 }
 #else
 
-#	ifndef MAP_TABLE_SINGLE_THREAD
-/**
- * Free the memory from an old table.  By the time that this is reached, there
- * are no heap pointers pointing to this table.  There may be iterators, in
- * which case we push this cleanup to the back of the queue and try it again
- * later.  Alternatively, there may be some lookups in progress.  These all
- * take a maximum of 32 hash lookups to complete.  The time taken for the hash
- * function, however, is not deterministic.  To be on the safe side, we
- * calculate the hash of every single element in the table before freeing it.
- */
-static void PREFIX(_table_collect_garbage)(void *t)
-{
-	PREFIX(_table) *table = t;
-	usleep(5000);
-	// If there are outstanding enumerators on this table, try again later.
-	if (table->enumerator_count > 0)
-	{
-		objc_collect_garbage_data(PREFIX(_table_collect_garbage), t);
-		return;
-	}
-	for (uint32_t i=0 ; i<table->table_size ; i++)
-	{
-		MAP_TABLE_VALUE_TYPE value = table->table[i].value;
-		if (!MAP_TABLE_VALUE_NULL(value))
-		{
-			MAP_TABLE_HASH_VALUE(value);
-		}
-	}
-	free(table->table);
-	free(table);
-}
-#	endif
-
 static int PREFIX(_insert)(PREFIX(_table) *table, MAP_TABLE_VALUE_TYPE value);
 
 static int PREFIX(_table_resize)(PREFIX(_table) *table)
 {
-	// Note: We multiply the table size, rather than the count, by two so that
-	// we get overflow checking in calloc.  Two times the size of a cell will
-	// never overflow, but two times the table size might.
-	struct PREFIX(_table_cell_struct) *newArray = calloc(table->table_size, 2 *
-			sizeof(struct PREFIX(_table_cell_struct)));
+	struct PREFIX(_table_cell_struct) *newArray =
+		PREFIX(alloc_cells)(table, table->table_size * 2);
 	if (NULL == newArray) { return 0; }
 
 	// Allocate a new table structure and move the array into that.  Now
 	// lookups will try using that one, if possible.
-	PREFIX(_table) *copy = calloc(1, sizeof(PREFIX(_table)));
+	PREFIX(_table) *copy = CALLOC(1, sizeof(PREFIX(_table)));
 	memcpy(copy, table, sizeof(PREFIX(_table)));
 	table->old = copy;
 
@@ -191,11 +196,10 @@ static int PREFIX(_table_resize)(PREFIX(_table) *table)
 			PREFIX(_insert)(table, value);
 		}
 	}
+	__sync_synchronize();
 	table->old = NULL;
-#	ifdef MAP_TABLE_SINGLE_THREAD
+#	if !defined(ENABLE_GC) && defined(MAP_TABLE_SINGLE_THREAD)
 	free(copy);
-#	else
-	objc_collect_garbage_data(PREFIX(_table_collect_garbage), copy);
 #	endif
 	return 1;
 }
@@ -426,7 +430,7 @@ static MAP_TABLE_VALUE_TYPE
 #endif
 }
 __attribute__((unused))
-static void PREFIX(_table_set)(PREFIX(_table) *table, void *key,
+static void PREFIX(_table_set)(PREFIX(_table) *table, const void *key,
 		MAP_TABLE_VALUE_TYPE value)
 {
 	PREFIX(_table_cell) cell = PREFIX(_table_get_cell)(table, key);
@@ -448,21 +452,23 @@ PREFIX(_next)(PREFIX(_table) *table,
 {
 	if (NULL == *state)
 	{
-		*state = calloc(1, sizeof(struct PREFIX(_table_enumerator)));
+		*state = CALLOC(1, sizeof(struct PREFIX(_table_enumerator)));
 		// Make sure that we are not reallocating the table when we start
 		// enumerating
 		MAP_LOCK();
 		(*state)->table = table;
 		(*state)->index = -1;
-		__sync_fetch_and_add(&table->enumerator_count, 1);
+		IF_NO_GC(__sync_fetch_and_add(&table->enumerator_count, 1);)
 		MAP_UNLOCK();
 	}
 	if ((*state)->seen >= (*state)->table->table_used)
 	{
+#ifndef ENABLE_GC
 		MAP_LOCK();
 		__sync_fetch_and_sub(&table->enumerator_count, 1);
 		MAP_UNLOCK();
 		free(*state);
+#endif
 #ifdef MAP_TABLE_ACCESS_BY_REFERENCE
 		return NULL;
 #else
@@ -481,11 +487,13 @@ PREFIX(_next)(PREFIX(_table) *table,
 #endif
 		}
 	}
+#ifndef ENABLE_GC
 	// Should not be reached, but may be if the table is unsafely modified.
 	MAP_LOCK();
 	table->enumerator_count--;
 	MAP_UNLOCK();
 	free(*state);
+#endif
 #ifdef MAP_TABLE_ACCESS_BY_REFERENCE
 	return NULL;
 #else
@@ -529,18 +537,14 @@ PREFIX(_current)(PREFIX(_table) *table,
 
 #undef MAP_TABLE_VALUE_TYPE
 
-#ifndef MAP_TABLE_NO_LOCK
-#	undef MAP_LOCK
-#	undef MAP_UNLOCK
-#else
+#undef MAP_LOCK
+#undef MAP_UNLOCK
+#ifdef MAP_TABLE_NO_LOCK
 #	undef MAP_TABLE_NO_LOCK
 #endif
 
-#if !defined(APPORTABLE)
-// TODO(jackson): Understand what this is and why we want it
 #ifdef MAP_TABLE_SINGLE_THREAD
 #	undef MAP_TABLE_SINGLE_THREAD
-#endif
 #endif
 
 #undef MAP_TABLE_VALUE_NULL
@@ -549,3 +553,8 @@ PREFIX(_current)(PREFIX(_table) *table,
 #ifdef MAP_TABLE_ACCESS_BY_REFERENCE
 #	undef MAP_TABLE_ACCESS_BY_REFERENCE
 #endif
+
+#undef CALLOC
+#undef IF_NO_GC
+#undef IF_GC
+#undef MAP_TABLE_TYPES_BITMAP

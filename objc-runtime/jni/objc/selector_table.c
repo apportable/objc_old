@@ -14,6 +14,7 @@
 #include "method_list.h"
 #include "class.h"
 #include "selector.h"
+#include "visibility.h"
 
 #ifdef TYPE_DEPENDENT_DISPATCH
 #	define TDD(x) x
@@ -40,13 +41,12 @@ static uint32_t selector_count = 1;
 /**
  * Mapping from selector numbers to selector names.
  */
-static SparseArray *selector_list  = NULL;
+PRIVATE SparseArray *selector_list  = NULL;
 
 // Get the functions for string hashing
 #include "string_hash.h"
 
-
-inline static BOOL isSelRegistered(SEL sel)
+PRIVATE inline BOOL isSelRegistered(SEL sel)
 {
 	if ((uintptr_t)sel->name < (uintptr_t)selector_count)
 	{
@@ -61,7 +61,7 @@ static const char *sel_getNameNonUnique(SEL sel)
 	if (isSelRegistered(sel))
 	{
 		struct sel_type_list * list =
-			SparseArrayLookup(selector_list, (uint32_t)(uintptr_t)sel->name);
+			SparseArrayLookup(selector_list, sel->index);
 		name = (list == NULL) ? NULL : list->value;
 	}
 	if (NULL == name)
@@ -189,8 +189,24 @@ static inline uint32_t hash_selector(const void *s)
 	{
 		hash = hash * 33 + c;
 	}
-	// FIXME: We might want to make the hash dependent on the types, since not
-	// doing so increases the number of potential hash collisions.
+#ifdef TYPE_DEPENDENT_DISPATCH
+	// We can't use all of the values in the type encoding for the hash,
+	// because our equality test is a bit more complex than simple string
+	// encoding (for example, * and ^C have to be considered equivalent, since
+	// they are both used as encodings for C strings in different situations)
+	if ((str = sel_getType_np(sel)))
+	{
+		while((c = (uint32_t)*str++))
+		{
+			switch (c)
+			{
+				case '@': case 'i': case 'I': case 'l': case 'L':
+				case 'q': case 'Q': case 's': case 'S': 
+				hash = hash * 33 + c;
+			}
+		}
+	}
+#endif
 	return hash;
 }
 
@@ -219,16 +235,16 @@ void objc_resize_dtables(uint32_t);
 /**
  * Create data structures to store selectors.
  */
-void __objc_init_selector_tables()
+PRIVATE void init_selector_tables()
 {
 	selector_list = SparseArrayNew();
 	INIT_LOCK(selector_table_lock);
-	sel_table = selector_create(4096);
+	selector_initialize(&sel_table, 4096);
 }
 
 static SEL selector_lookup(const char *name, const char *types)
 {
-	struct objc_selector sel = {name, types};
+	struct objc_selector sel = {{name}, types};
 	return selector_table_get(sel_table, &sel);
 }
 static inline void add_selector_to_table(SEL aSel, int32_t uid, uint32_t idx)
@@ -253,7 +269,7 @@ static inline void register_selector_locked(SEL aSel)
 	uintptr_t idx = selector_count++;
 	if (NULL == aSel->types)
 	{
-		fprintf(stderr, "Registering selector %d %s\n", idx, sel_getNameNonUnique(aSel));
+		fprintf(stderr, "Registering selector %d %s\n", (int)idx, sel_getNameNonUnique(aSel));
 		add_selector_to_table(aSel, idx, idx);
 		objc_resize_dtables(selector_count);
 		return;
@@ -265,7 +281,7 @@ static inline void register_selector_locked(SEL aSel)
 		untyped = selector_pool_alloc();
 		untyped->name = aSel->name;
 		untyped->types = 0;
-		fprintf(stderr, "Registering selector %d %s\n", idx, sel_getNameNonUnique(aSel));
+		fprintf(stderr, "Registering selector %d %s\n", (int)idx, sel_getNameNonUnique(aSel));
 		add_selector_to_table(untyped, idx, idx);
 		// If we are in type dependent dispatch mode, the uid for the typed
 		// and untyped versions will be different
@@ -278,14 +294,14 @@ static inline void register_selector_locked(SEL aSel)
 	}
 	uintptr_t uid = (uintptr_t)untyped->name;
 	TDD(uid = idx);
-	fprintf(stderr, "Registering typed selector %d %s %s\n", uid, sel_getNameNonUnique(aSel), sel_getType_np(aSel));
+	fprintf(stderr, "Registering typed selector %d %s %s\n", (int)uid, sel_getNameNonUnique(aSel), sel_getType_np(aSel));
 	add_selector_to_table(aSel, uid, idx);
 
 	// Add this set of types to the list.
 	// This is quite horrible.  Most selectors will only have one type
 	// encoding, so we're wasting a lot of memory like this.
 	struct sel_type_list *typeListHead =
-		SparseArrayLookup(selector_list, (uint32_t)(uintptr_t)untyped->name);
+		SparseArrayLookup(selector_list, untyped->index);
 	struct sel_type_list *typeList =
 		(struct sel_type_list *)selector_pool_alloc();
 	typeList->value = aSel->types;
@@ -296,7 +312,7 @@ static inline void register_selector_locked(SEL aSel)
 /**
  * Registers a selector.  This assumes that the argument is never deallocated.
  */
-SEL objc_register_selector(SEL aSel)
+PRIVATE SEL objc_register_selector(SEL aSel)
 {
 	if (isSelRegistered(aSel))
 	{
@@ -318,7 +334,7 @@ SEL objc_register_selector(SEL aSel)
 /**
  * Registers a selector by copying the argument.
  */
-static SEL objc_register_selector_copy(SEL aSel)
+static SEL objc_register_selector_copy(SEL aSel, BOOL copyArgs)
 {
 	// If an identical selector is already registered, return it.
 	SEL copy = selector_lookup(aSel->name, aSel->types);
@@ -328,7 +344,7 @@ static SEL objc_register_selector_copy(SEL aSel)
 	//fprintf(stderr, "Not adding new copy\n");
 		return copy;
 	}
-	LOCK_UNTIL_RETURN(&selector_table_lock);
+	LOCK_FOR_SCOPE(&selector_table_lock);
 	copy = selector_lookup(aSel->name, aSel->types);
 	if (NULL != copy && selector_identical(aSel, copy))
 	{
@@ -336,11 +352,35 @@ static SEL objc_register_selector_copy(SEL aSel)
 	}
 	// Create a copy of this selector.
 	copy = selector_pool_alloc();
-	copy->name = strdup(aSel->name);
-	copy->types = (NULL == aSel->types) ? NULL : strdup(aSel->types);
+	copy->name = copyArgs ? strdup(aSel->name) : aSel->name;
+	copy->types = (NULL == aSel->types) ? NULL :
+	                 (copyArgs ? strdup(aSel->types) : aSel->types);
 	// Try to register the copy as the authoritative version
 	register_selector_locked(copy);
 	return copy;
+}
+
+PRIVATE uint32_t sel_nextTypeIndex(uint32_t untypedIdx, uint32_t idx)
+{
+	struct sel_type_list *list =
+		SparseArrayLookup(selector_list, untypedIdx);
+
+	if (NULL == list) { return 0; }
+
+	const char *selName = list->value;
+	list = list->next;
+	BOOL found = untypedIdx == idx;
+	while (NULL != list)
+	{
+		SEL sel = selector_lookup(selName, list->value);
+		if (sel->index == untypedIdx) { return 0; }
+		if (found)
+		{
+			return sel->index;
+		}
+		found = (sel->index == idx);
+	}
+	return 0;
 }
 
 /**
@@ -354,7 +394,7 @@ const char *sel_getName(SEL sel)
 	if (isSelRegistered(sel))
 	{
 		struct sel_type_list * list =
-			SparseArrayLookup(selector_list, (uint32_t)(uintptr_t)sel->name);
+			SparseArrayLookup(selector_list, sel->index);
 		name = (list == NULL) ? NULL : list->value;
 	}
 	else
@@ -396,15 +436,15 @@ BOOL sel_isEqual(SEL sel1, SEL sel2)
 SEL sel_registerName(const char *selName)
 {
 	if (NULL == selName) { return NULL; }
-	struct objc_selector sel = {selName, 0};
-	return objc_register_selector_copy(&sel);
+	struct objc_selector sel = {{selName}, 0};
+	return objc_register_selector_copy(&sel, YES);
 }
 
 SEL sel_registerTypedName_np(const char *selName, const char *types)
 {
 	if (NULL == selName) { return NULL; }
-	struct objc_selector sel = {selName, types};
-	return objc_register_selector_copy(&sel);
+	struct objc_selector sel = {{selName}, types};
+	return objc_register_selector_copy(&sel, YES);
 }
 
 const char *sel_getType_np(SEL aSel)
@@ -478,26 +518,26 @@ unsigned sel_copyTypedSelectors_np(const char *selName, SEL *const sels, unsigne
 	return found;
 }
 
-void objc_register_selectors_from_list(struct objc_method_list *l)
+PRIVATE void objc_register_selectors_from_list(struct objc_method_list *l)
 {
 	for (int i=0 ; i<l->count ; i++)
 	{
 		Method m = &l->methods[i];
-		struct objc_selector sel = { (const char*)m->selector, m->types };
-		m->selector = objc_register_selector_copy(&sel);
+		struct objc_selector sel = { {(const char*)m->selector}, m->types };
+		m->selector = objc_register_selector_copy(&sel, NO);
 	}
 }
 /**
  * Register all of the (unregistered) selectors that are used in a class.
  */
-void objc_register_selectors_from_class(Class class)
+PRIVATE void objc_register_selectors_from_class(Class class)
 {
 	for (struct objc_method_list *l=class->methods ; NULL!=l ; l=l->next)
 	{
 		objc_register_selectors_from_list(l);
 	}
 }
-void objc_register_selector_array(SEL selectors, unsigned long count)
+PRIVATE void objc_register_selector_array(SEL selectors, unsigned long count)
 {
 	// GCC is broken and always sets the count to 0, so we ignore count until
 	// we can throw stupid and buggy compilers in the bin.
@@ -514,7 +554,7 @@ void objc_register_selector_array(SEL selectors, unsigned long count)
  * All of the functions in this section are deprecated and should not be used
  * in new code.
  */
-
+#ifndef NO_LEGACY
 SEL sel_get_typed_uid (const char *name, const char *types)
 {
 	if (NULL == name) { return NULL; }
@@ -589,44 +629,4 @@ BOOL sel_eq(SEL s1, SEL s2)
 	return sel_isEqual(s1, s2);
 }
 
-/*
- * Some simple sanity tests.
- */
-#ifdef SEL_TEST
-static void logSelector(SEL sel)
-{
-	fprintf(stderr, "%s = {%p, %s}\n", sel_getNameNonUnique(sel), sel->name, sel_getType_np(sel));
-}
-void objc_resize_dtables(uint32_t ignored) {}
-
-int main(void)
-{
-	__objc_init_selector_tables();
-	SEL a = sel_registerTypedName_np("foo:", "1234");
-	logSelector(a);
-	a = sel_registerName("bar:");
-	a = sel_registerName("foo:");
-	logSelector(a);
-	logSelector(sel_get_any_typed_uid("foo:"));
-	a = sel_registerTypedName_np("foo:", "1234");
-	logSelector(a);
-	logSelector(sel_get_any_typed_uid("foo:"));
-	a = sel_registerTypedName_np("foo:", "456");
-	logSelector(a);
-	unsigned count = sel_copyTypes("foo:", NULL, 0);
-	const char *types[count];
-	sel_copyTypes("foo:", types, count);
-	for (unsigned i=0 ; i<count ; i++)
-	{
-		fprintf(stderr, "Found type %s\n", types[i]);
-	}
-	uint32_t idx=0;
-	struct sel_type_list *type;
-	while ((type= SparseArrayNext(selector_list, &idx)))
-	{
-		fprintf(stderr, "Idx: %d, sel: %s (%s)\n", idx, type->value, ((struct sel_type_list *)SparseArrayLookup(selector_list, idx))->value);
-	}
-	fprintf(stderr, "Number of types: %d\n", count);
-	SEL sel;
-}
-#endif
+#endif // NO_LEGACY

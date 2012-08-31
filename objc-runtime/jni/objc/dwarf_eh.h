@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <stdint.h>
 
-// _GNU_SOURCE must be defiend for unwind.h to expose some of the functions
+// _GNU_SOURCE must be defined for unwind.h to expose some of the functions
 // that we want.  If it isn't, then we define it and undefine it to make sure
 // that it doesn't impact the rest of the program.
 #ifndef _GNU_SOURCE
@@ -16,6 +16,9 @@
 #	include "unwind.h"
 #endif
 
+/**
+ * Type used to store pointers to values computed by DWARF expressions.
+ */
 typedef unsigned char *dw_eh_ptr_t;
 // Flag indicating a signed quantity
 #define DW_EH_PE_signed 0x08
@@ -140,7 +143,7 @@ static uint64_t read_value(char encoding, unsigned char **data)
 {
 	enum dwarf_data_encoding type = get_encoding(encoding);
 	uint64_t v;
-	switch (type)
+	switch ((int)type)
 	{
 		// Read fixed-length types
 #define READ(dwarf, type) \
@@ -277,6 +280,7 @@ struct dwarf_eh_action
 /**
  * Look up the landing pad that corresponds to the current invoke.
  */
+__attribute__((unused))
 static struct dwarf_eh_action 
 	dwarf_eh_find_callsite(struct _Unwind_Context *context, struct dwarf_eh_lsda *lsda)
 {
@@ -315,3 +319,5 @@ static struct dwarf_eh_action
 	}
 	return result;
 }
+
+#define EXCEPTION_CLASS(a,b,c,d,e,f,g,h) (((uint64_t)a << 56) + ((uint64_t)b << 48) + ((uint64_t)c << 40) + ((uint64_t)d << 32) + ((uint64_t)e << 24) + ((uint64_t)f << 16) + ((uint64_t)g << 8) + ((uint64_t)h))

@@ -1,3 +1,4 @@
+#include "llvm/Analysis/Verifier.h"
 #include "IMPCacher.h"
 #include "llvm/Pass.h"
 #include "llvm/Function.h"
@@ -11,15 +12,16 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "LLVMCompat.h"
+
 GNUstep::IMPCacher::IMPCacher(LLVMContext &C, Pass *owner) : Context(C),
   Owner(owner) {
 
   PtrTy = Type::getInt8PtrTy(Context);
-  // FIXME: 64-bit.
-  IntTy = Type::getInt32Ty(Context);
+  IntTy = (sizeof(int) == 4 ) ? Type::getInt32Ty(C) : Type::getInt64Ty(C);
   IdTy = PointerType::getUnqual(PtrTy);
   Value *AlreadyCachedFlagValue = MDString::get(C, "IMPCached");
-  AlreadyCachedFlag = MDNode::get(C, &AlreadyCachedFlagValue, 1);
+  AlreadyCachedFlag = CreateMDNode(C, &AlreadyCachedFlagValue);
   IMPCacheFlagKind = Context.getMDKindID("IMPCache");
 }
 
@@ -30,32 +32,62 @@ void GNUstep::IMPCacher::CacheLookup(Instruction *lookup, Value *slot, Value
   if (lookup->getMetadata(IMPCacheFlagKind)) { return; }
 
   lookup->setMetadata(IMPCacheFlagKind, AlreadyCachedFlag);
+  bool isInvoke = false;
 
   BasicBlock *beforeLookupBB = lookup->getParent();
   BasicBlock *lookupBB = SplitBlock(beforeLookupBB, lookup, Owner);
-  BasicBlock::iterator iter = lookup;
-  iter++;
-  BasicBlock *afterLookupBB = SplitBlock(iter->getParent(), iter, Owner);
+  BasicBlock *lookupFinishedBB = lookupBB;
+  BasicBlock *afterLookupBB;
+
+  if (InvokeInst *inv = dyn_cast<InvokeInst>(lookup)) {
+    afterLookupBB = inv->getNormalDest();
+    lookupFinishedBB =
+      BasicBlock::Create(Context, "done_lookup", lookupBB->getParent()); 
+    CGBuilder B(lookupFinishedBB);
+    B.CreateBr(afterLookupBB);
+    inv->setNormalDest(lookupFinishedBB);
+    isInvoke = true;
+  } else {
+    BasicBlock::iterator iter = lookup;
+    iter++;
+    afterLookupBB = SplitBlock(iter->getParent(), iter, Owner);
+  }
 
   removeTerminator(beforeLookupBB);
 
-  IRBuilder<> B = IRBuilder<>(beforeLookupBB);
+  CGBuilder B = CGBuilder(beforeLookupBB);
   // Load the slot and check that neither it nor the version is 0.
-  Value *slotValue = B.CreateLoad(slot);
   Value *versionValue = B.CreateLoad(version);
-  Value *receiverPtr = lookup->getOperand(1);
+  Value *receiverPtr = lookup->getOperand(0);
   Value *receiver = receiverPtr;
   if (!isSuperMessage) {
     receiver = B.CreateLoad(receiverPtr);
   }
+  // For small objects, we skip the cache entirely.  
+  // FIXME: Class messages are never to small objects...
+  bool is64Bit = llvm::Module::Pointer64 ==
+    B.GetInsertBlock()->getParent()->getParent()->getPointerSize();
+  LLVMType *intPtrTy = is64Bit ? Type::getInt64Ty(Context) :
+    Type::getInt32Ty(Context);
+
+  // Receiver as an integer
+  Value *receiverSmallObject = B.CreatePtrToInt(receiver, intPtrTy);
+  // Receiver is a small object...
+  receiverSmallObject =
+    B.CreateAnd(receiverSmallObject, is64Bit ? 7 : 1);
+  // Receiver is not a small object.
+  receiverSmallObject =
+    B.CreateICmpNE(receiverSmallObject, Constant::getNullValue(intPtrTy));
+  // Ideally, we'd call objc_msgSend() here, but for now just skip the cache
+  // lookup
 
   Value *isCacheEmpty = 
-        B.CreateOr(versionValue, B.CreatePtrToInt(slotValue, IntTy));
-  isCacheEmpty = 
-    B.CreateICmpEQ(isCacheEmpty, Constant::getNullValue(IntTy));
-  Value *receiverNotNil =
-     B.CreateICmpNE(receiver, Constant::getNullValue(receiver->getType()));
-  isCacheEmpty = B.CreateAnd(isCacheEmpty, receiverNotNil);
+    B.CreateICmpEQ(versionValue, Constant::getNullValue(IntTy));
+  Value *receiverNil =
+     B.CreateICmpEQ(receiver, Constant::getNullValue(receiver->getType()));
+
+  isCacheEmpty = B.CreateOr(isCacheEmpty, receiverNil);
+  isCacheEmpty = B.CreateOr(isCacheEmpty, receiverSmallObject);
       
   BasicBlock *cacheLookupBB = BasicBlock::Create(Context, "cache_check",
       lookupBB->getParent());
@@ -64,6 +96,7 @@ void GNUstep::IMPCacher::CacheLookup(Instruction *lookup, Value *slot, Value
 
   // Check the cache node is current
   B.SetInsertPoint(cacheLookupBB);
+  Value *slotValue = B.CreateLoad(slot, "slot_value");
   Value *slotVersion = B.CreateStructGEP(slotValue, 3);
   // Note: Volatile load because the slot version might have changed in
   // another thread.
@@ -77,15 +110,16 @@ void GNUstep::IMPCacher::CacheLookup(Instruction *lookup, Value *slot, Value
   // If this slot is still valid, skip the lookup.
   B.CreateCondBr(isSlotValid, afterLookupBB, lookupBB);
 
+  // Perform the real lookup and cache the result
+  removeTerminator(lookupFinishedBB);
   // Replace the looked up slot with the loaded one
   B.SetInsertPoint(afterLookupBB, afterLookupBB->begin());
+  PHINode *newLookup = IRBuilderCreatePHI(&B, lookup->getType(), 3, "new_lookup");
   // Not volatile, so a redundant load elimination pass can do some phi
   // magic with this later.
-  lookup->replaceAllUsesWith(B.CreateLoad(slot));
+  lookup->replaceAllUsesWith(newLookup);
 
-  // Perform the real lookup and cache the result
-  removeTerminator(lookupBB);
-  B.SetInsertPoint(lookupBB);
+  B.SetInsertPoint(lookupFinishedBB);
   Value * newReceiver = receiver;
   if (!isSuperMessage) {
     newReceiver = B.CreateLoad(receiverPtr);
@@ -94,8 +128,11 @@ void GNUstep::IMPCacher::CacheLookup(Instruction *lookup, Value *slot, Value
       lookupBB->getParent());
 
   // Don't store the cached lookup if we are doing forwarding tricks.
-  B.CreateCondBr(B.CreateICmpEQ(receiver, newReceiver), storeCacheBB,
-      afterLookupBB);
+  // Also skip caching small object messages for now
+  Value *skipCacheWrite =
+    B.CreateOr(B.CreateICmpNE(receiver, newReceiver), receiverSmallObject);
+  skipCacheWrite = B.CreateOr(skipCacheWrite, receiverNil);
+  B.CreateCondBr(skipCacheWrite, afterLookupBB, storeCacheBB);
   B.SetInsertPoint(storeCacheBB);
 
   // Store it even if the version is 0, because we always check that the
@@ -106,6 +143,10 @@ void GNUstep::IMPCacher::CacheLookup(Instruction *lookup, Value *slot, Value
   cls = B.CreateLoad(B.CreateBitCast(receiver, IdTy));
   B.CreateStore(cls, B.CreateStructGEP(lookup, 1));
   B.CreateBr(afterLookupBB);
+
+  newLookup->addIncoming(lookup, lookupFinishedBB);
+  newLookup->addIncoming(slotValue, cacheLookupBB);
+  newLookup->addIncoming(lookup, storeCacheBB);
 }
 
 
@@ -127,7 +168,8 @@ void GNUstep::IMPCacher::SpeculativelyInline(Instruction *call, Function
   // Put a branch before the call, testing whether the callee really is the
   // function
   IRBuilder<> B = IRBuilder<>(beforeCallBB);
-  Value *callee = call->getOperand(0);
+  Value *callee = isa<CallInst>(call) ? cast<CallInst>(call)->getCalledValue()
+      : cast<InvokeInst>(call)->getCalledValue();
 
   const FunctionType *FTy = function->getFunctionType();
   const FunctionType *calleeTy = cast<FunctionType>(
@@ -144,17 +186,16 @@ void GNUstep::IMPCacher::SpeculativelyInline(Instruction *call, Function
   Instruction *inlineCall = call->clone();
   Value *inlineResult= inlineCall;
   inlineBB->getInstList().push_back(inlineCall);
-  inlineCall->setOperand(0, function);
 
   B.SetInsertPoint(inlineBB);
 
   if (calleeTy != FTy) {
     for (unsigned i=0 ; i<FTy->getNumParams() ; i++) {
-      const Type *callType = calleeTy->getParamType(i);
-      const Type *argType = FTy->getParamType(i);
+      LLVMType *callType = calleeTy->getParamType(i);
+      LLVMType *argType = FTy->getParamType(i);
       if (callType != argType) {
-        inlineCall->setOperand(i+1, new
-            BitCastInst(inlineCall->getOperand(i+1), argType, "", inlineCall));
+        inlineCall->setOperand(i, new
+            BitCastInst(inlineCall->getOperand(i), argType, "", inlineCall));
       }
     }
     if (FTy->getReturnType() != calleeTy->getReturnType()) {
@@ -171,8 +212,7 @@ void GNUstep::IMPCacher::SpeculativelyInline(Instruction *call, Function
 
   // Unify the return values
   if (call->getType() != Type::getVoidTy(Context)) {
-    B.SetInsertPoint(afterCallBB, afterCallBB->begin());
-    PHINode *phi = B.CreatePHI(call->getType());
+    PHINode *phi = CreatePHI(call->getType(), 2, "", afterCallBB->begin());
     call->replaceAllUsesWith(phi);
     phi->addIncoming(call, callBB);
     phi->addIncoming(inlineResult, inlineBB);
@@ -181,10 +221,63 @@ void GNUstep::IMPCacher::SpeculativelyInline(Instruction *call, Function
   // Really do the real inlining
   InlineFunctionInfo IFI(0, 0);
   if (CallInst *c = dyn_cast<CallInst>(inlineCall)) {
+    c->setCalledFunction(function);
     InlineFunction(c, IFI);
   } else if (InvokeInst *c = dyn_cast<InvokeInst>(inlineCall)) {
+    c->setCalledFunction(function);
     InlineFunction(c, IFI);
   }
+}
+
+CallSite GNUstep::IMPCacher::SplitSend(CallSite msgSend)
+{
+  BasicBlock *lookupBB = msgSend->getParent();
+  Function *F = lookupBB->getParent();
+  Module *M = F->getParent();
+  Function *send = M->getFunction("objc_msgSend");
+  Function *send_stret = M->getFunction("objc_msgSend_stret");
+  Function *send_fpret = M->getFunction("objc_msgSend_fpret");
+  Value *self;
+  Value *cmd;
+  int selfIndex = 0;
+  if ((msgSend.getCalledFunction() == send) ||
+      (msgSend.getCalledFunction() == send_fpret)) {
+    self = msgSend.getArgument(0);
+    cmd = msgSend.getArgument(1);
+  } else if (msgSend.getCalledFunction() == send_stret) {
+    selfIndex = 1;
+    self = msgSend.getArgument(1);
+    cmd = msgSend.getArgument(2);
+  } else {
+    abort();
+    return CallSite();
+  }
+  CGBuilder B(&F->getEntryBlock(), F->getEntryBlock().begin());
+  Value *selfPtr = B.CreateAlloca(self->getType());
+  B.SetInsertPoint(msgSend.getInstruction());
+  B.CreateStore(self, selfPtr, true);
+  LLVMType *impTy = msgSend.getCalledValue()->getType();
+  LLVMType *slotTy = PointerType::getUnqual(StructType::get(PtrTy, PtrTy, PtrTy,
+        IntTy, impTy, PtrTy, NULL));
+  Value *slot;
+  Constant *lookupFn = M->getOrInsertFunction("objc_msg_lookup_sender",
+      slotTy, selfPtr->getType(), cmd->getType(), PtrTy, NULL);
+  if (msgSend.isCall()) {
+    slot = B.CreateCall3(lookupFn, selfPtr, cmd, Constant::getNullValue(PtrTy));
+  } else {
+    InvokeInst *inv = cast<InvokeInst>(msgSend.getInstruction());
+    BasicBlock *callBB = SplitBlock(lookupBB, msgSend.getInstruction(), Owner);
+    removeTerminator(lookupBB);
+    B.SetInsertPoint(lookupBB);
+    slot = B.CreateInvoke3(lookupFn, callBB, inv->getUnwindDest(), selfPtr, cmd,
+        Constant::getNullValue(PtrTy));
+    addPredecssor(inv->getUnwindDest(), msgSend->getParent(), lookupBB);
+    B.SetInsertPoint(msgSend.getInstruction());
+  }
+  Value *imp = B.CreateLoad(B.CreateStructGEP(slot, 4));
+  msgSend.setArgument(selfIndex, B.CreateLoad(selfPtr, true));
+  msgSend.setCalledFunction(imp);
+  return CallSite(slot);
 }
 
 // Cleanly removes a terminator instruction.
@@ -199,4 +292,12 @@ void GNUstep::removeTerminator(BasicBlock *BB) {
   BBTerm->replaceAllUsesWith(UndefValue::get(BBTerm->getType()));
   // Remove the terminator instruction itself.
   BBTerm->eraseFromParent();
+}
+void GNUstep::addPredecssor(BasicBlock *block, BasicBlock *oldPredecessor,
+    BasicBlock *newPredecessor) {
+  for (BasicBlock::iterator i=block->begin() ; PHINode *phi=dyn_cast<PHINode>(i)
+      ; ++i) {
+    Value *v = phi->getIncomingValueForBlock(oldPredecessor);
+    phi->addIncoming(v, newPredecessor);
+  }
 }

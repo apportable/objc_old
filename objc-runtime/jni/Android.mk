@@ -129,32 +129,38 @@ endif
 
 
 LOCAL_SRC_FILES :=  \
-                    Protocol2.o \
-                    abi_version.o \
-                    caps.o \
-                    category_loader.o \
-                    class_table.o \
-                    dtable.o \
-                    eh_personality.o \
-                    encoding2.o \
-                    hooks.o \
-                    ivar.o \
-                    legacy_malloc.o \
-                    loader.o \
-                    mutation.o \
-                    properties.o \
-                    protocol.o \
-                    runtime.o \
-                    sarray2.o \
-                    selector_table.o \
-                    sendmsg2.o \
-                    statics_loader.o \
-                    sync.o \
-                    associations.o \
-                    NSBlocks.o \
-                    blocks/runtime.o \
-                    blocks/data.o \
-                    ill_object.o \
+	gc_none.o \
+	NSBlocks.o \
+	Protocol2.o \
+	arc.o \
+	alias_table.o \
+	abi_version.o \
+	associate.o \
+	block_to_imp.o \
+	block_trampolines.o \
+	blocks_runtime.o \
+	caps.o \
+	category_loader.o \
+	class_table.o \
+	dtable.o \
+	eh_personality.o \
+	encoding2.o \
+	hash_table.o \
+	hooks.o \
+	ill_object.o \
+	ivar.o \
+	legacy_malloc.o \
+	loader.o \
+	mutation.o \
+	objc_msgSend.o \
+	properties.o \
+	protocol.o \
+	runtime.o \
+	sarray2.o \
+	selector_table.o \
+	sendmsg2.o \
+	statics_loader.o \
+	toydispatch.o \
 
 ifeq ($(EFENCE),yes)
 LOCAL_SRC_FILES += \
@@ -244,6 +250,11 @@ $(OBJDIR)/%.out.s: $(ROOTDIR)/$(MODULE)/%.m .SECONDARY
 	@mkdir -p $(dir $@)
 	@$(CC) -MD -MT $@ $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S $< -o $@
 
+$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.S .SECONARY
+	@echo Assembling $<
+	mkdir -p $(dir $@)
+	@$(CC) $(MODULE_ASFLAGS) -c $< -o $@
+
 $(OBJDIR)/%.fixed.s: $(OBJDIR)/%.out.s .SECONDARY
 	@echo fixing $<
 	@perl fixup_assembly.pl < $< > $@
@@ -252,10 +263,11 @@ $(OBJDIR)/%.o: $(OBJDIR)/%.fixed.s
 	@echo assembling $<
 	@$(CCAS) $(MODULE_ASFLAGS) -c $< -o $@
 
-$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.s
+$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.S
 	@echo Assembling $<
 	mkdir -p $(dir $@)
-	@$(CC) $(MODULE_ASFLAGS) -c $< -o $@
+	@$(CCAS) $(MODULE_ASFLAGS) -c $< -o $@
+
 
 
 # End Compile Rules
@@ -287,7 +299,7 @@ $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.m
   @mkdir -p $(dir $@)
   @$(CC) $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
-$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.s
+$(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.S
   @echo Skipping analysis $<
 
 # End Analyze Rules
