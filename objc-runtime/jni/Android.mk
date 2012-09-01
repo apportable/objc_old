@@ -136,9 +136,6 @@ LOCAL_SRC_FILES :=  \
 	alias_table.o \
 	abi_version.o \
 	associate.o \
-	block_to_imp.o \
-	block_trampolines.o \
-	blocks_runtime.o \
 	caps.o \
 	category_loader.o \
 	class_table.o \
@@ -147,7 +144,6 @@ LOCAL_SRC_FILES :=  \
 	encoding2.o \
 	hash_table.o \
 	hooks.o \
-	ill_object.o \
 	ivar.o \
 	legacy_malloc.o \
 	loader.o \
@@ -160,6 +156,8 @@ LOCAL_SRC_FILES :=  \
 	selector_table.o \
 	sendmsg2.o \
 	statics_loader.o \
+	blocks/runtime.o \
+    blocks/data.o \
 	toydispatch.o \
 
 ifeq ($(EFENCE),yes)
