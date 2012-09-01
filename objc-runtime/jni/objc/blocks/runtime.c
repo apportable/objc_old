@@ -730,3 +730,9 @@ const char *_Block_byref_dump(struct Block_byref *src) {
     return buffer;
 }
 
+void* block_load_weak(void *block)
+{
+    struct Block_layout *self = block;
+    return (self->reserved) > 0 ? block : 0;
+}
+

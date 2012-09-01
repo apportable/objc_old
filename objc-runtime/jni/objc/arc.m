@@ -661,7 +661,7 @@ void objc_moveWeak(id *dest, id *src)
 	// Don't retain or release.  While the weak ref lock is held, we know that
 	// the object can't be deallocated, so we just move the value and update
 	// the weak reference table entry to indicate the new address.
-	LOCK_FOR_SCOPE(&weakRefLock);
+	LOCK_FOR_SCOPE(&weakRefLock); 
 	*dest = *src;
 	*src = nil;
 	WeakRef *oldRef = weak_ref_table_get(weakRefs, *dest);

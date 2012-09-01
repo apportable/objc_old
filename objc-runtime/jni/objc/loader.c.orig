@@ -52,7 +52,12 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 		// pure-C main() function spawns two threads which then, concurrently,
 		// call dlopen() or equivalent, and the platform's implementation of
 		// this does not perform any synchronization.
+<<<<<<< HEAD
+		INIT_LOCK(objc_runtime_mutex);
+		
+=======
 		INIT_LOCK(runtime_mutex);
+>>>>>>> origin/gnu_objc2_1.6
 		// Create the various tables that the runtime needs.
 		init_selector_tables();
 		init_protocol_table();
@@ -60,7 +65,7 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 		init_dispatch_tables();
 		init_alias_table();
 		init_arc();
-		//init_trampolines();
+		init_trampolines();
 		first_run = NO;
 	}
 

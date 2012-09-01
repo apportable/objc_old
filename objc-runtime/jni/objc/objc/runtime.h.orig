@@ -200,7 +200,7 @@ typedef struct
 #endif
 
 #ifndef nil
-#	define nil (_OBJC_NULL_PTR)
+#	define nil ((id)_OBJC_NULL_PTR)
 #endif
 
 #ifndef Nil
@@ -834,6 +834,20 @@ unsigned sel_copyTypedSelectors_np(const char *selName, SEL *const sels, unsigne
 extern struct objc_slot *objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 	OBJC_NONPORTABLE;
 
+<<<<<<< HEAD
+// This uses a GCC extension, but the is no good way of doing it otherwise.
+#define objc_msgSend(theReceiver, theSelector, ...) \
+({\
+	id __receiver = theReceiver;\
+	SEL __op = theSelector;\
+	id __result = objc_msg_lookup_sender(&__receiver, __op, theReceiver)->method(__receiver, __op, ## __VA_ARGS__);\
+    __result;\
+})
+
+#define objc_msgSendSuper(super, op, ...) objc_msg_lookup_super(super, op)((super)->receiver, op, ## __VA_ARGS__)
+
+=======
+>>>>>>> origin/gnu_objc2_1.6
 /**
  * Registers a class for small objects.  Small objects are stored inside a
  * pointer.  If the class can be registered, then this returns YES.  The second
