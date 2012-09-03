@@ -17,7 +17,7 @@
 .macro MSGSEND receiver, sel
 	.fnstart
 	teq    \receiver, 0
-	beq    4f                              // Skip everything if the receiver is nil
+	beq    5f                              // Skip everything if the receiver is nil
 	push   {r4-r6}                         // Were going to use these three as
 	.save  {r4-r6}
 	                                       // scratch registers, so save them now.
@@ -38,43 +38,49 @@
 	ldr    r5, [r5]
 
 	teq    r4, r5                          // If dtable == &uninstalled_dtable
-	beq    5f                              // Do a slow lookup
+	beq    6f                              // Do a slow lookup
 
 	ldr    r5, [\sel]                      // selector->index -> r5
 
 	ldr    r6, [r4, #SHIFT_OFFSET]        // dtable->shift -> r6
 	ldr    r4, [r4, #DATA_OFFSET]         // dtable->data -> r4
 	
-	teq    r6, #8                         // If this is a small dtable, jump to the small dtable handlers
+	teq    r6, #16                        // If this is a small dtable, jump to the small dtable handlers
 	beq    1f
-	teq    r6, #0
+	teq    r6, #8
 	beq    2f
+	teq    r6, #0
+	beq    3f
 
+	and    r6, r5, #0xff000000
+	ldr    r4, [r4, r6, asr#22]
+	ldr    r4, [r4, #DATA_OFFSET]        
+1:  									  // dtable16
 	and    r6, r5, #0xff0000
 	ldr    r4, [r4, r6, asr#14]
-	ldr    r4, [r4, #DTABLE_OFFSET]        
-1:                                        // dtable16
+	ldr    r4, [r4, #DATA_OFFSET]        
+2:                                        // dtable16
 	and    r6, r5, #0xff00
 	ldr    r4, [r4, r6, asr#6]
-	ldr    r4, [r4, #DTABLE_OFFSET]        
-2:                                        // dtable8
+	ldr    r4, [r4, #DATA_OFFSET]        
+3:                                        // dtable8
 	and    r6, r5, #0xff
 	ldr    ip, [r4, r6, asl#2]
 
 	teq    ip, #0                         // If the slot is nil
-	beq    5f                             // Go to the slow path and do the forwarding stuff
+	beq    6f                             // Go to the slow path and do the forwarding stuff
 
 	ldr   ip, [ip, #SLOT_OFFSET]          // Load the method from the slot
 
-3: 
+4: 
 	pop    {r4-r6}                        // Restore the saved callee-save registers
 	mov    pc, ip
 
-4:                                        // Nil receiver
+5:                                        // Nil receiver
 	mov    r0, 0
 	mov    r1, 0
 	mov    pc, lr
-5:                                        // Slow lookup
+6:                                        // Slow lookup
 	push   {r0-r4, lr}                    // Save anything that will be clobbered by the call
 	.save  {r0-r4, lr}
 
