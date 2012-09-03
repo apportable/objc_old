@@ -362,7 +362,6 @@ IMP class_getMethodImplementation_stret(Class cls, SEL name)
 // Legacy compatibility
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef NO_LEGACY
 /**
  * Legacy message lookup function.
  */
@@ -385,7 +384,7 @@ void *objc_msg_sendv(void)
 	fprintf(stderr, "objc_msg_sendv() never worked correctly.  Don't use it.\n");
 	abort();
 }
-#endif
+
 /**
  * Legacy message lookup function.  Does not support fast proxies or safe IMP
  * caching.
