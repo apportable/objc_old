@@ -64,7 +64,7 @@
 	teq    ip, #0                         // If the slot is nil
 	beq    5f                             // Go to the slow path and do the forwarding stuff
 
-	ldr   ip, [ip, #SLOT_OFFSET]          // Load the method from the slot
+	ldr    ip, [ip, #SLOT_OFFSET]          // Load the method from the slot
 
 3: 
 	pop    {r4-r6}                        // Restore the saved callee-save registers
@@ -81,9 +81,10 @@
 
 	push   {\receiver}                    // &self, _cmd in arguments
 	.save  {\receiver}
+	mov    r0, \receiver
 	mov    r1, \sel
 
-	bl     slowMsgLookup(PLT)             // This is the only place where the CFI directives have to be accurate...
+	bl     objc_msg_lookup(PLT)             // This is the only place where the CFI directives have to be accurate...
 	mov    ip, r0                         // IMP -> ip
 
 	pop    {r5}                           // restore (modified) self to r5

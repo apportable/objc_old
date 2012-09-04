@@ -656,7 +656,6 @@ PRIVATE void objc_send_initialize(id object)
 	}
 	Class meta = class->isa;
 
-
 	// Make sure that the class is resolved.
 	objc_resolve_class(class);
 

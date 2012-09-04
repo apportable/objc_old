@@ -111,9 +111,9 @@ retry:;
 }
 
 PRIVATE
-IMP slowMsgLookup(id *receiver, SEL cmd)
+IMP slowMsgLookup(id receiver, SEL cmd)
 {
-	return objc_msg_lookup_sender(receiver, cmd, nil)->method;
+	return objc_msg_lookup_internal(&receiver, cmd, nil)->method;
 }
 
 PRIVATE void logInt(void *a)
@@ -397,7 +397,7 @@ IMP objc_msg_lookup(id receiver, SEL selector)
 	Slot_t slot = objc_msg_lookup_internal(&self, selector, nil);
 	if (self != receiver)
 	{
-		slot = __objc_msg_forward3(receiver, selector);
+		slot = __objc_msg_forward3(receiver, selector); 
 	}
 	return slot->method;
 }
