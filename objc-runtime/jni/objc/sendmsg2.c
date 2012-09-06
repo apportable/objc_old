@@ -13,10 +13,11 @@ void objc_send_initialize(id object);
 // Removed __thread because __thread isn't supported on Windows.
 
 #ifndef NDEBUG
+static void forward_nil_break() { }
 #define LOG_NIL_MSG() do { \
 	const char *name = sel_getName(_cmd); \
 	if (self && strcmp(name, "release")) { \
-		DEBUG_LOG("Missing implementation of %s %s", (self == NULL || IS_ILL_OBJECT(self))? "<INVALID>" : class_getName(object_getClass(self)), name); \
+		DEBUG_LOG("Missing implementation of [%s %s]; break on forward_nil_break() to debug", (self == NULL || IS_ILL_OBJECT(self))? "<INVALID>" : class_getName(object_getClass(self)), name); \
 	} \
 } while(0)
 #else
@@ -128,8 +129,8 @@ typedef struct objc_slot *Slot_t;
 
 Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender);
 
-static inline Slot_t lookup_nil_slot(SEL selector) {
-	const char *types = sel_getType_np(selector);
+static inline Slot_t lookup_nil_slot(id self, SEL _cmd) {
+	const char *types = sel_getType_np(_cmd);
 	if (types == NULL) {
 		return &forward_unknown_slot;
 	}
@@ -169,6 +170,7 @@ static inline Slot_t lookup_nil_slot(SEL selector) {
 			return &forward_slot;
 		/*unknown type*/
 		default:
+			LOG_NIL_MSG();
 			return &forward_unknown_slot;
 
 	}
@@ -176,8 +178,8 @@ static inline Slot_t lookup_nil_slot(SEL selector) {
 
 // Default implementations of the two new hooks.  Return NULL.
 static id objc_proxy_lookup_null(id receiver, SEL op) { return nil; }
-static Slot_t objc_msg_forward3_null(id receiver, SEL op) { return lookup_nil_slot(op); }
-static Slot_t objc_msg_forward4_null(id receiver, SEL op) { return lookup_nil_slot(op); }
+static Slot_t objc_msg_forward3_null(id receiver, SEL op) { return lookup_nil_slot(receiver, op); }
+static Slot_t objc_msg_forward4_null(id receiver, SEL op) { return lookup_nil_slot(receiver, op); }
 
 id (*objc_proxy_lookup)(id receiver, SEL op) = objc_proxy_lookup_null;
 Slot_t (*__objc_msg_forward3)(id receiver, SEL op) = objc_msg_forward3_null;
@@ -207,7 +209,7 @@ Slot_t objc_msg_lookup_internal(id *receiver,
 retry:;
 	if (CHECK_ILL_OBJECT_WHEN(*receiver, "looking up a selector %s", sel_getName(selector)))
 	{
-		return lookup_nil_slot(selector);
+		return lookup_nil_slot(nil, selector);
 	}
 	Slot_t result = objc_dtable_lookup((*receiver)->isa->dtable,
 			PTR_TO_IDX(selector->name));
@@ -276,7 +278,7 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 	// inlined trivially.
 	if(*receiver == nil)
 	{
-		return lookup_nil_slot(selector);
+		return lookup_nil_slot(nil, selector);
 	}
 
 	/*
@@ -305,7 +307,7 @@ Slot_t objc_slot_lookup_super(struct objc_super *super, SEL selector)
 	if (CHECK_ILL_OBJECT_WHEN(super->receiver,
 			"looking up super selector %s", sel_getName(selector)))
 	{
-		return lookup_nil_slot(selector);
+		return lookup_nil_slot(nil, selector);
 	}
 	id receiver = super->receiver;
 	if (receiver)
@@ -323,7 +325,7 @@ Slot_t objc_slot_lookup_super(struct objc_super *super, SEL selector)
 	}
 	else
 	{
-		return lookup_nil_slot(selector);
+		return lookup_nil_slot(nil, selector);
 	}
 }
 
