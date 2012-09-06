@@ -180,6 +180,11 @@ objc_property_t class_getProperty(Class cls, const char *name)
 		}
 		properties = properties->next;
 	}
+
+	if(cls->super_class != NULL) {
+		return class_getProperty(cls->super_class, name);
+	}
+
 	return NULL;
 }
 
