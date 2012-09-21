@@ -5,6 +5,7 @@ flags = [
 defines = {
     'MAP_TABLE_SINGLE_THREAD' : 1,
     'MAP_TABLE_NO_LOCK' : 1,
+    'VERDE_USE_REAL_ASSERT' : 1,
 }
 
 header_paths = [
