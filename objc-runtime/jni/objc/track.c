@@ -20,6 +20,11 @@ static pthread_mutex_t allocationLock = PTHREAD_MUTEX_INITIALIZER;
 static int track_enabled = 1;
 static int track_interval = 5000;
 
+
+int count_sort(objc_allocations *entrya, objc_allocations *entryb) {
+    return entrya->count - entrya->count;
+}
+
 static void force_log_allocations()
 {
     objc_allocations *entry, *tmp;
@@ -32,7 +37,7 @@ static void force_log_allocations()
         }
         else
         {
-            DEBUG_LOG("%s %d", class_getName(entry->cls), entry->count);
+            DEBUG_LOG("%d %s ", entry->count, class_getName(entry->cls));
         }
     }
     DEBUG_LOG("=================================================");
