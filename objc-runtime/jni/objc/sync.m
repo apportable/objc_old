@@ -25,13 +25,9 @@
 #import <objc/runtime.h>
 #import <strings.h>
 #import <errno.h>
-#ifdef SUPPORT_DIRECT_THREAD_KEYS
- #error
-#endif
-#undef SUPPORT_DIRECT_THREAD_KEYS
 #define require_action_string(cond, dest, act, msg) do { if (!(cond)) { { act; } DEBUG_LOG("%s", msg); goto dest; } } while (0)
-#define require_noerr_string(err, dest, msg) do { if (err) DEBUG_LOG("%s", msg); goto dest; } while (0)
-#define require_string(cond, dest, msg) do { if (!(cond)) DEBUG_LOG("%s", msg); goto dest; } while (0)
+#define require_noerr_string(err, dest, msg) do { if (err) { DEBUG_LOG("%s", msg); goto dest; } } while (0)
+#define require_string(cond, dest, msg) do { if (!(cond)) { DEBUG_LOG("%s", msg); goto dest; } } while (0)
 
 enum {
     OBJC_SYNC_SUCCESS                 = 0,
@@ -59,8 +55,8 @@ typedef struct {
 typedef struct SyncData {
     struct SyncData* nextData;
     id               object;
-    int              threadCount;  // number of THREADS using this block
-    pthread_mutex_t   mutex;
+    volatile int     threadCount;  // number of THREADS using this block
+    pthread_mutex_t  mutex;
 } SyncData;
 
 typedef struct {
@@ -102,7 +98,6 @@ enum usage { ACQUIRE, RELEASE, CHECK };
 
 static pthread_once_t _objc_pthread_once;
 static pthread_key_t _objc_pthread_key;
-static pthread_mutex_t threadCountLock = PTHREAD_MUTEX_INITIALIZER;
 
 static void _objc_destroy_key(void *entry)
 {
@@ -164,58 +159,12 @@ static void _destroySyncCache(struct SyncCache *cache)
 }
 
 
-static SyncData* id2data(id object, enum usage why)
+static int _obj_lock(id object, enum usage why)
 {
     pthread_mutex_t *lockp = &LOCK_FOR_OBJ(object);
     SyncData **listp = &LIST_FOR_OBJ(object);
-    SyncData* result = NULL;
-
-#if SUPPORT_DIRECT_THREAD_KEYS
-    // Check per-thread single-entry fast cache for matching object
-    BOOL fastCacheOccupied = NO;
-    SyncData *data = tls_get_direct(SYNC_DATA_DIRECT_KEY);
-    if (data) {
-        fastCacheOccupied = YES;
-
-        if (data->object == object) {
-            // Found a match in fast cache.
-            uintptr_t lockCount;
-
-            result = data;
-            lockCount = (uintptr_t)tls_get_direct(SYNC_COUNT_DIRECT_KEY);
-            require_action_string(result->threadCount > 0, fastcache_done, 
-                                  result = NULL, "id2data fastcache is buggy");
-            require_action_string(lockCount > 0, fastcache_done, 
-                                  result = NULL, "id2data fastcache is buggy");
-
-            switch(why) {
-            case ACQUIRE: {
-                lockCount++;
-                tls_set_direct(SYNC_COUNT_DIRECT_KEY, (void*)lockCount);
-                break;
-            }
-            case RELEASE:
-                lockCount--;
-                tls_set_direct(SYNC_COUNT_DIRECT_KEY, (void*)lockCount);
-                if (lockCount == 0) {
-                    // remove from fast cache
-                    tls_set_direct(SYNC_DATA_DIRECT_KEY, NULL);
-                    // atomic because may collide with concurrent ACQUIRE
-                    pthread_mutex_lock(&threadCountLock);
-                    result->threadCount++;
-                    pthread_mutex_unlock(&threadCountLock);
-                }
-                break;
-            case CHECK:
-                // do nothing
-                break;
-            }
-
-        fastcache_done:     
-            return result;            
-        }
-    }
-#endif
+    SyncData* sync = NULL;
+    int result = 0;
 
     // Check per-thread cache of already-owned locks for matching object
     SyncCache *cache = fetch_cache(NO);
@@ -226,25 +175,25 @@ static SyncData* id2data(id object, enum usage why)
             if (item->data->object != object) continue;
 
             // Found a match.
-            result = item->data;
-            require_action_string(result->threadCount > 0, cache_done, 
-                                  result = NULL, "id2data cache is buggy");
+            sync = item->data;
+            require_action_string(sync->threadCount > 0, cache_done,
+                                  sync = NULL, "_obj_lock cache is buggy");
             require_action_string(item->lockCount > 0, cache_done, 
-                                  result = NULL, "id2data cache is buggy");
+                                  sync = NULL, "_obj_lock cache is buggy");
                 
             switch(why) {
             case ACQUIRE:
+                result = pthread_mutex_lock(&sync->mutex);
                 item->lockCount++;
                 break;
             case RELEASE:
+                result = pthread_mutex_unlock(&sync->mutex);
                 item->lockCount--;
                 if (item->lockCount == 0) {
                     // remove from per-thread cache
                     cache->list[i] = cache->list[--cache->used];
                     // atomic because may collide with concurrent ACQUIRE
-                    pthread_mutex_lock(&threadCountLock);
-                    result->threadCount--;
-                    pthread_mutex_unlock(&threadCountLock);
+                    __sync_add_and_fetch(&sync->threadCount, -1);
                 }
                 break;
             case CHECK:
@@ -256,6 +205,10 @@ static SyncData* id2data(id object, enum usage why)
             return result;
         }
     }
+
+    // Only new ACQUIRE should get here.
+    require_action_string(why == ACQUIRE, really_done,
+                          result = EPERM, "_obj_lock is buggy");
 
     // Thread cache didn't find anything.
     // Walk in-use list looking for matching object
@@ -271,26 +224,20 @@ static SyncData* id2data(id object, enum usage why)
         SyncData* firstUnused = NULL;
         for (p = *listp; p != NULL; p = p->nextData) {
             if ( p->object == object ) {
-                result = p;
+                sync = p;
                 // atomic because may collide with concurrent RELEASE
-                pthread_mutex_lock(&threadCountLock);
-                result->threadCount--;
-                pthread_mutex_unlock(&threadCountLock);
+                __sync_add_and_fetch(&sync->threadCount, +1);
                 goto done;
             }
             if ( (firstUnused == NULL) && (p->threadCount == 0) )
                 firstUnused = p;
         }
     
-        // no SyncData currently associated with object
-        if ( (why == RELEASE) || (why == CHECK) )
-            goto done;
-    
         // an unused one was found, use it
         if ( firstUnused != NULL ) {
-            result = firstUnused;
-            result->object = object;
-            result->threadCount = 1;
+            sync = firstUnused;
+            sync->object = object;
+            sync->threadCount = 1;
             goto done;
         }
     }
@@ -299,44 +246,30 @@ static SyncData* id2data(id object, enum usage why)
     // XXX calling malloc with a global lock held is bad practice,
     // might be worth releasing the lock, mallocing, and searching again.
     // But since we never free these guys we won't be stuck in malloc very often.
-    result = (SyncData*)calloc(sizeof(SyncData), 1);
-    result->object = object;
-    result->threadCount = 1;
+    sync = (SyncData*)calloc(sizeof(SyncData), 1);
+    sync->object = object;
+    sync->threadCount = 1;
     pthread_mutexattr_t attr;
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(&result->mutex, &attr);
-    result->nextData = *listp;
-    *listp = result;
+    pthread_mutex_init(&sync->mutex, &attr);
+    sync->nextData = *listp;
+    *listp = sync;
     
  done:
     pthread_mutex_unlock(lockp);
-    if (result) {
-        // Only new ACQUIRE should get here.
-        // All RELEASE and CHECK and recursive ACQUIRE are 
-        // handled by the per-thread caches above.
-        
-        require_string(result != NULL, really_done, "id2data is buggy");
-        require_action_string(why == ACQUIRE, really_done, 
-                              result = NULL, "id2data is buggy");
-        require_action_string(result->object == object, really_done, 
-                              result = NULL, "id2data is buggy");
 
-#if SUPPORT_DIRECT_THREAD_KEYS
-        if (!fastCacheOccupied) {
-            // Save in fast thread cache
-            tls_set_direct(SYNC_DATA_DIRECT_KEY, result);
-            tls_set_direct(SYNC_COUNT_DIRECT_KEY, (void*)1);
-        } else 
-#endif
-        {
-            // Save in thread cache
-            if (!cache) cache = fetch_cache(YES);
-            cache->list[cache->used].data = result;
-            cache->list[cache->used].lockCount = 1;
-            cache->used++;
-        }
-    }
+    require_string(sync != NULL, really_done, "_obj_lock is buggy");
+    require_action_string(sync->object == object, really_done,
+                          result = EPERM, "_obj_lock is buggy");
+
+    // Save in thread cache
+    if (!cache) cache = fetch_cache(YES);
+    cache->list[cache->used].data = sync;
+    cache->list[cache->used].lockCount = 1;
+    cache->used++;
+
+    result = pthread_mutex_lock(&sync->mutex);
 
  really_done:
     return result;
@@ -357,10 +290,7 @@ int objc_sync_enter(id obj)
     int result = OBJC_SYNC_SUCCESS;
 
     if (obj) {
-        SyncData* data = id2data(obj, ACQUIRE);
-        require_action_string(data != NULL, done, result = OBJC_SYNC_NOT_INITIALIZED, "id2data failed");
-    
-        result = pthread_mutex_lock(&data->mutex);
+        int result = _obj_lock(obj, ACQUIRE);
         require_noerr_string(result, done, "mutex_lock failed");
     } else {
         // @synchronized(nil) does nothing
@@ -382,10 +312,7 @@ int objc_sync_exit(id obj)
     int result = OBJC_SYNC_SUCCESS;
     
     if (obj) {
-        SyncData* data = id2data(obj, RELEASE); 
-        require_action_string(data != NULL, done, result = OBJC_SYNC_NOT_OWNING_THREAD_ERROR, "id2data failed");
-        
-        result = pthread_mutex_unlock(&data->mutex);
+        int result = _obj_lock(obj, RELEASE);
         require_noerr_string(result, done, "mutex_unlock failed");
     } else {
         // @synchronized(nil) does nothing
