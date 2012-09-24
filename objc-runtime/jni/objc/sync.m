@@ -290,7 +290,7 @@ int objc_sync_enter(id obj)
     int result = OBJC_SYNC_SUCCESS;
 
     if (obj) {
-        int result = _obj_lock(obj, ACQUIRE);
+        result = _obj_lock(obj, ACQUIRE);
         require_noerr_string(result, done, "mutex_lock failed");
     } else {
         // @synchronized(nil) does nothing
@@ -312,7 +312,7 @@ int objc_sync_exit(id obj)
     int result = OBJC_SYNC_SUCCESS;
     
     if (obj) {
-        int result = _obj_lock(obj, RELEASE);
+        result = _obj_lock(obj, RELEASE);
         require_noerr_string(result, done, "mutex_unlock failed");
     } else {
         // @synchronized(nil) does nothing
