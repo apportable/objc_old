@@ -6,6 +6,9 @@
 #define wrap(a) je_ ## a
 #endif
 
+extern void *wrap(malloc)(size_t sz);
+extern void wrap(free)(void *ptr);
+
 /* operator new(unsigned int) */
 void *
 wrap(_Znwj)(unsigned int size)

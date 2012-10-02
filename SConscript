@@ -6,10 +6,13 @@ defines = {
     'MAP_TABLE_SINGLE_THREAD' : 1,
     'MAP_TABLE_NO_LOCK' : 1,
     'VERDE_USE_REAL_ASSERT' : 1,
+    'MOZ_MEMORY' : 1,
+    'MOZ_MEMORY_ANDROID' : 1,
+    'MOZ_MEMORY_LINUX' : 1,
 }
 
 header_paths = [
-
+    'System/objc/objc-runtime/jni/objc/jemalloc'
 ]
 
 deps = [
@@ -44,6 +47,8 @@ sources = [
     'objc-runtime/jni/objc/blocks/data.c',
     'objc-runtime/jni/objc/ill_object.c',
     'objc-runtime/jni/objc/unwind_stubs.m',
+    'objc-runtime/jni/objc/jemalloc/jemalloc.c',
+    'objc-runtime/jni/objc/jemalloc/extra_malloc.c',
 ]
 
 Import('env')
