@@ -49,6 +49,8 @@ sources = [
     'objc-runtime/jni/objc/unwind_stubs.m',
     'objc-runtime/jni/objc/jemalloc/jemalloc.c',
     'objc-runtime/jni/objc/jemalloc/extra_malloc.c',
+    {'source' : 'objc-runtime/jni/objc/extra/ffs.c', 'env' : {'TARGET_ARCH' : 'x86', 'TARGET_OS' : 'android'}},
+    {'source' : 'objc-runtime/jni/objc/extra/atexit.c', 'env' : {'TARGET_ARCH' : 'x86', 'TARGET_OS' : 'android'}},
 ]
 
 Import('env')
