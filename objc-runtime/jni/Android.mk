@@ -294,32 +294,32 @@ else
 # Start Analyze Rules
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.mm
-  @echo Analyzing $<
-  @mkdir -p $(dir $@)
-  @$(CC) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+	@echo Analyzing $<
+	@mkdir -p $(dir $@)
+	@$(CC) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.cc
-  @echo Analyzing $<
-  @mkdir -p $(dir $@)
-  @$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+	@echo Analyzing $<
+	@mkdir -p $(dir $@)
+	@$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.cpp
-  @echo Analyzing $<
-  @mkdir -p $(dir $@)
-  @$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+	@echo Analyzing $<
+	@mkdir -p $(dir $@)
+	@$(CC) -x objective-c++ -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.c
-  @echo Analyzing $<
-  @mkdir -p $(dir $@)
-  @$(CC) $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+	@echo Analyzing $<
+	@mkdir -p $(dir $@)
+	@$(CC) $(MODULE_CFLAGS) -fblocks $(MODULE_CCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.m
-  @echo Analyzing $<
-  @mkdir -p $(dir $@)
-  @$(CC) $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
+	@echo Analyzing $<
+	@mkdir -p $(dir $@)
+	@$(CC) $(MODULE_CFLAGS) $(MODULE_CCFLAGS) $(MODULE_OBJCFLAGS) $(DEBUG_LOGGING_FLAGS) -D__REAL_BASE_FILE__="\"$<\"" $(DEP_DEFS) -S --analyze $< -o /dev/null 2>> $(ANALYZE_OUTPUT)
 
 $(OBJDIR)/%.o: $(ROOTDIR)/$(MODULE)/%.s
-  @echo Skipping analysis $<
+	@echo Skipping analysis $<
 
 # End Analyze Rules
 endif
