@@ -82,10 +82,10 @@ LOCAL_CFLAGS    +=  \
                     -DMOZ_MEMORY_ANDROID \
                     -DMOZ_MEMORY_LINUX \
 
-#debug malloc 
-#LOCAL_CFLAGS +=     -DMALLOC_DEBUG
-
-
+#debug malloc
+ifneq ($(BUILD), release)
+	LOCAL_CFLAGS +=  -DMALLOC_DEBUG
+endif
 
 ifeq ($(TARGET_ARCH_ABI),x86)
 LOCAL_CFLAGS    +=  \
