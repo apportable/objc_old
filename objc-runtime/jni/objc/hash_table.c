@@ -8,6 +8,7 @@ static dispatch_queue_t garbage_queue;
 
 PRIVATE void objc_collect_garbage_data(void(*cleanup)(void*), void *garbage)
 {
+#if 0
 	if (0 == garbage_queue)
 	{
 		LOCK_RUNTIME_FOR_SCOPE();
@@ -17,6 +18,7 @@ PRIVATE void objc_collect_garbage_data(void(*cleanup)(void*), void *garbage)
 		}
 	}
 	dispatch_async_f(garbage_queue, garbage, cleanup);
+#endif
 }
 
 #endif
