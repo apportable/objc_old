@@ -192,7 +192,7 @@ Slot_t objc_slot_lookup_super(struct objc_super *super, SEL selector)
 				selector->index);
 		if (0 == result)
 		{
-			Class class = classForObject(receiver);
+			class = classForObject(receiver);
 			// Dtable should always be installed in the superclass
 			// Unfortunately, some stupid code (PyObjC) decides to use this
 			// mechanism for everything 

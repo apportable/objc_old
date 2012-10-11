@@ -71,8 +71,8 @@ static inline struct arc_tls* getARCThreadData(void)
 	return tls;
 #endif
 }
-int count = 0;
-int poolCount = 0;
+static int arp_count = 0;
+static int poolCount = 0;
 static inline void release(id obj);
 
 /**
@@ -113,7 +113,7 @@ static void emptyPool(struct arc_tls *tls, id *stop)
 			// This may autorelease some other objects, so we have to work in
 			// the case where the autorelease pool is extended during a -release.
 			release(*tls->pool->insert);
-			count--;
+			arp_count--;
 		}
 		void *old = tls->pool;
 		tls->pool = tls->pool->previous;
@@ -125,7 +125,7 @@ static void emptyPool(struct arc_tls *tls, id *stop)
 		       (tls->pool->insert > tls->pool->pool))
 		{
 			tls->pool->insert--;
-			count--;
+			arp_count--;
 			release(*tls->pool->insert);
 		}
 	}
@@ -239,7 +239,7 @@ static inline id autorelease(id obj)
 				pool->insert = pool->pool;
 				tls->pool = pool;
 			}
-			count++;
+			arp_count++;
 			*pool->insert = obj;
 			pool->insert++;
 			return obj;
@@ -260,21 +260,21 @@ static inline id autorelease(id obj)
 unsigned long objc_arc_autorelease_count_np(void)
 {
 	struct arc_tls* tls = getARCThreadData();
-	unsigned long count = 0;
+	unsigned long ar_count = 0;
 	if (!tls) { return 0; }
 
 	for (struct arc_autorelease_pool *pool=tls->pool ;
 	     NULL != pool ;
 	     pool = pool->previous)
 	{
-		count += (((intptr_t)pool->insert) - ((intptr_t)pool->pool)) / sizeof(id);
+		ar_count += (((intptr_t)pool->insert) - ((intptr_t)pool->pool)) / sizeof(id);
 	}
-	return count;
+	return ar_count;
 }
 unsigned long objc_arc_autorelease_count_for_object_np(id obj)
 {
 	struct arc_tls* tls = getARCThreadData();
-	unsigned long count = 0;
+	unsigned long ar_count = 0;
 	if (!tls) { return 0; }
 
 	for (struct arc_autorelease_pool *pool=tls->pool ;
@@ -285,11 +285,11 @@ unsigned long objc_arc_autorelease_count_for_object_np(id obj)
 		{
 			if (*o == obj)
 			{
-				count++;
+				ar_count++;
 			}
 		}
 	}
-	return count;
+	return ar_count;
 }
 
 

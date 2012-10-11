@@ -329,10 +329,10 @@ id objc_getAssociatedObject(id object, const void *key)
 			if (list != next_list)
 			{
 				list = next_list;
-				struct reference *r = findReference(list, key);
-				if (NULL != r)
+				struct reference *ref = findReference(list, key);
+				if (NULL != ref)
 				{
-					return r->object;
+					return ref->object;
 				}
 			}
 			cls = class_getSuperclass(cls);
