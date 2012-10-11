@@ -378,9 +378,7 @@ PRIVATE void objc_load_class(struct objc_class *class)
 	{
 		if (objc_developer_mode_developer != mode)
 		{
-			fprintf(stderr,
-				"Loading two versions of %s.  The class that will be used is undefined\n",
-				class->name);
+			DEBUG_LOG("Loading two versions of %s.  The class that will be used is undefined",class->name);
 			return;
 		}
 		reload_class(class, existingClass);

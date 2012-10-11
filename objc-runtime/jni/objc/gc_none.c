@@ -35,8 +35,6 @@ BOOL isGCEnabled = NO;
 
 void enableGC(BOOL exclusive)
 {
-	fprintf(stderr, "Attempting to enable garbage collection, but your"
-			"Objective-C runtime was built without garbage collection"
-			"support\n");
+	DEBUG_LOG("Attempting to enable garbage collection, but your Objective-C runtime was built without garbage collection support");
 	abort();
 }
