@@ -639,3 +639,9 @@ void _Block_object_dispose(const void *object, const int flags) {
         _Block_release_object(object);
     }
 }
+
+void *block_load_weak(void *block)
+{
+    struct Block_layout *self = block;
+    return (self->reserved) > 0 ? block : 0;
+}
