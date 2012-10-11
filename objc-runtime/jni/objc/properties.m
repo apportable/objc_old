@@ -616,7 +616,11 @@ struct objc_property_extra *property_createExtras(objc_property_t property) {
 
 	// 1. Create the name
 	const char *c = strchr(property->name, '|');
-	entry->name = strndup(property->name, c - property->name);
+	if (c != NULL) {
+		entry->name = strndup(property->name, c - property->name);
+	} else {
+		entry->name = strdup(property->name);
+	}
 
 	// 2. Create the attr string
 	size_t attrsSize = makeAttributeString(property, NULL);

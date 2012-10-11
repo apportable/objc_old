@@ -116,11 +116,6 @@ IMP slowMsgLookup(id receiver, SEL cmd)
 	return objc_msg_lookup_internal(&receiver, cmd, nil)->method;
 }
 
-PRIVATE void logInt(void *a)
-{
-	fprintf(stderr, "Value: %p\n", a);
-}
-
 Slot_t (*objc_plane_lookup)(id *receiver, SEL op, id sender) =
 	objc_msg_lookup_internal;
 
@@ -137,9 +132,14 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 {
 	// Returning a nil slot allows the caller to cache the lookup for nil too,
 	// although this is not particularly useful because the nil method can be
-	// inlined trivially.
+	// inlined trivially
+
 	if (UNLIKELY(*receiver == nil))
 	{
+		if (UNLIKELY((*receiver)->isa == 0)) {
+			DEBUG_BREAK(); //race?
+			return &nil_slot;
+		}
 		// Return the correct kind of zero, depending on the type encoding.
 		if (selector->types)
 		{
@@ -159,6 +159,8 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 		}
 		return &nil_slot;
 	}
+
+
 
 	/*
 	 * The self pointer is invalid in some code.  This test is disabled until
@@ -243,6 +245,7 @@ struct profile_info
 
 static void profile_init(void)
 {
+#if 0
 	INIT_LOCK(profileLock);
 	profileSymbols = fopen("objc_profile.symbols", "a");
 	profileData = fopen("objc_profile.data", "a");
@@ -250,10 +253,12 @@ static void profile_init(void)
 	fprintf(profileSymbols, "=== NEW TRACE ===\n");
 	struct profile_info profile_data = { 0, 0, 0 };
 	fwrite(&profile_data, sizeof(profile_data), 1, profileData);
+#endif
 }
 
 void objc_profile_write_symbols(char **symbols)
 {
+#if 0
 	if (NULL == profileData)
 	{
 		LOCK_RUNTIME_FOR_SCOPE();
@@ -271,6 +276,7 @@ void objc_profile_write_symbols(char **symbols)
 	}
 	UNLOCK(&profileLock);
 	fflush(profileSymbols);
+#endif
 }
 
 /**
@@ -283,6 +289,7 @@ void objc_profile_write_symbols(char **symbols)
 void objc_msg_profile(id receiver, IMP method,
                       const char *module, int32_t callsite)
 {
+#if 0
 	// Initialize the logging lazily.  This prevents us from wasting any memory
 	// when we are not profiling.
 	if (NULL == profileData)
@@ -295,6 +302,7 @@ void objc_msg_profile(id receiver, IMP method,
 	}
 	struct profile_info profile_data = { module, callsite, method };
 	fwrite(&profile_data, sizeof(profile_data), 1, profileData);
+#endif
 }
 
 /**

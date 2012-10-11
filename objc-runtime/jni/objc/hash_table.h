@@ -24,17 +24,9 @@
 #include <stdlib.h>
 
 
-#ifdef ENABLE_GC
-#	include <gc/gc.h>
-#	include <gc/gc_typed.h>
-#	define CALLOC(x,y) GC_MALLOC(x*y)
-#	define IF_NO_GC(x)
-#	define IF_GC(x) x
-#else
-#	define CALLOC(x,y) calloc(x,y)
-#	define IF_NO_GC(x) x
-#	define IF_GC(x)
-#endif
+#define CALLOC(x,y) calloc(x,y)
+#define IF_NO_GC(x) x
+#define IF_GC(x)
 
 #ifndef MAP_TABLE_NAME
 #	error You must define MAP_TABLE_NAME.
@@ -327,7 +319,6 @@ static int PREFIX(_insert)(PREFIX(_table) *table,
 		MAP_UNLOCK();
 		return PREFIX(_insert)(table, value);
 	}
-	fprintf(stderr, "Insert failed\n");
 	MAP_UNLOCK();
 	return 0;
 }

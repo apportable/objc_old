@@ -6,7 +6,8 @@
 // framework to replace it trivially
 void __attribute__((weak)) objc_enumerationMutation(id obj)
 {
-	fprintf(stderr, "Mutation occured during enumeration.");
+	DEBUG_LOG("Mutation occured during enumeration.");
+	DEBUG_BREAK();
 	abort();
 }
 

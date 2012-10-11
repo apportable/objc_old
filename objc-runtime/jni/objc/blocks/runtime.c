@@ -336,20 +336,20 @@ static void *_Block_copy_internal(const void *arg, const int flags) {
     else {
         // Under GC want allocation with refcount 1 so we ask for "true" if wantsOne
         // This allows the copy helper routines to make non-refcounted block copies under GC
-        unsigned long int flags = aBlock->flags;
+        unsigned long int blockFlags = aBlock->flags;
         bool hasCTOR = (flags & BLOCK_HAS_CTOR) != 0;
         struct Block_layout *result = _Block_allocator(aBlock->descriptor->size, wantsOne, hasCTOR);
         if (!result) return (void *)0;
         memmove(result, aBlock, aBlock->descriptor->size); // bitcopy first
         // reset refcount
         // if we copy a malloc block to a GC block then we need to clear NEEDS_FREE.
-        flags &= ~(BLOCK_NEEDS_FREE|BLOCK_REFCOUNT_MASK);   // XXX not needed
+        blockFlags &= ~(BLOCK_NEEDS_FREE|BLOCK_REFCOUNT_MASK);   // XXX not needed
         if (wantsOne)
-            flags |= BLOCK_IS_GC | 1;
+            blockFlags |= BLOCK_IS_GC | 1;
         else
-            flags |= BLOCK_IS_GC;
-        result->flags = flags;
-        if (flags & BLOCK_HAS_COPY_DISPOSE) {
+            blockFlags |= BLOCK_IS_GC;
+        result->flags = blockFlags;
+        if (blockFlags & BLOCK_HAS_COPY_DISPOSE) {
             //printf("calling block copy helper...\n");
             (*aBlock->descriptor->copy)(result, aBlock); // do fixup
         }
@@ -639,100 +639,3 @@ void _Block_object_dispose(const void *object, const int flags) {
         _Block_release_object(object);
     }
 }
-
-
-/*
- * Debugging support:
- */
-#if 0
-#pragma mark Debugging
-#endif /* if 0 */
-
-
-const char *_Block_dump(const void *block) {
-    struct Block_layout *closure = (struct Block_layout *)block;
-    static char buffer[512];
-    char *cp = buffer;
-    if (closure == NULL) {
-        sprintf(cp, "NULL passed to _Block_dump\n");
-        return buffer;
-    }
-    if (! (closure->flags & BLOCK_HAS_DESCRIPTOR)) {
-        printf("Block compiled by obsolete compiler, please recompile source for this Block\n");
-        exit(1);
-    }
-    cp += sprintf(cp, "^%p (new layout) =\n", (void *)closure);
-    if (closure->isa == NULL) {
-        cp += sprintf(cp, "isa: NULL\n");
-    }
-    else if (closure->isa == _NSConcreteStackBlock) {
-        cp += sprintf(cp, "isa: stack Block\n");
-    }
-    else if (closure->isa == _NSConcreteMallocBlock) {
-        cp += sprintf(cp, "isa: malloc heap Block\n");
-    }
-    else if (closure->isa == _NSConcreteAutoBlock) {
-        cp += sprintf(cp, "isa: GC heap Block\n");
-    }
-    else if (closure->isa == _NSConcreteGlobalBlock) {
-        cp += sprintf(cp, "isa: global Block\n");
-    }
-    else if (closure->isa == _NSConcreteFinalizingBlock) {
-        cp += sprintf(cp, "isa: finalizing Block\n");
-    }
-    else {
-        cp += sprintf(cp, "isa?: %p\n", (void *)closure->isa);
-    }
-    cp += sprintf(cp, "flags:");
-    if (closure->flags & BLOCK_HAS_DESCRIPTOR) {
-        cp += sprintf(cp, " HASDESCRIPTOR");
-    }
-    if (closure->flags & BLOCK_NEEDS_FREE) {
-        cp += sprintf(cp, " FREEME");
-    }
-    if (closure->flags & BLOCK_IS_GC) {
-        cp += sprintf(cp, " ISGC");
-    }
-    if (closure->flags & BLOCK_HAS_COPY_DISPOSE) {
-        cp += sprintf(cp, " HASHELP");
-    }
-    if (closure->flags & BLOCK_HAS_CTOR) {
-        cp += sprintf(cp, " HASCTOR");
-    }
-    cp += sprintf(cp, "\nrefcount: %u\n", closure->flags & BLOCK_REFCOUNT_MASK);
-    cp += sprintf(cp, "invoke: %p\n", (void *)(uintptr_t)closure->invoke);
-    {
-        struct Block_descriptor *dp = closure->descriptor;
-        cp += sprintf(cp, "descriptor: %p\n", (void *)dp);
-        cp += sprintf(cp, "descriptor->reserved: %lu\n", dp->reserved);
-        cp += sprintf(cp, "descriptor->size: %lu\n", dp->size);
-
-        if (closure->flags & BLOCK_HAS_COPY_DISPOSE) {
-            cp += sprintf(cp, "descriptor->copy helper: %p\n", (void *)(uintptr_t)dp->copy);
-            cp += sprintf(cp, "descriptor->dispose helper: %p\n", (void *)(uintptr_t)dp->dispose);
-        }
-    }
-    return buffer;
-}
-
-
-const char *_Block_byref_dump(struct Block_byref *src) {
-    static char buffer[256];
-    char *cp = buffer;
-    cp += sprintf(cp, "byref data block %p contents:\n", (void *)src);
-    cp += sprintf(cp, "  forwarding: %p\n", (void *)src->forwarding);
-    cp += sprintf(cp, "  flags: 0x%x\n", src->flags);
-    cp += sprintf(cp, "  size: %d\n", src->size);
-    if (src->flags & BLOCK_HAS_COPY_DISPOSE) {
-        cp += sprintf(cp, "  copy helper: %p\n", (void *)(uintptr_t)src->byref_keep);
-        cp += sprintf(cp, "  dispose helper: %p\n", (void *)(uintptr_t)src->byref_destroy);
-    }
-    return buffer;
-}
-
-void* block_load_weak(void *block)
-{
-    struct Block_layout *self = block;
-    return (self->reserved) > 0 ? block : 0;
-}
-

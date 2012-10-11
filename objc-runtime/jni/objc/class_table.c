@@ -278,8 +278,7 @@ void __objc_resolve_class_links(void)
 	static BOOL warned = NO;
 	if (!warned)
 	{
-		fprintf(stderr,
-			"Warning: Calling deprecated private ObjC runtime function %s\n", __func__);
+		DEBUG_LOG("Warning: Calling deprecated private ObjC runtime function %s\n", __func__);
 		warned = YES;
 	}
 	objc_resolve_class_links();
@@ -547,7 +546,7 @@ Class objc_next_class(void **enum_state)
 
 Class class_pose_as(Class impostor, Class super_class)
 {
-	fprintf(stderr, "Class posing is no longer supported.\n");
-	fprintf(stderr, "Please use class_replaceMethod() instead.\n");
+	DEBUG_LOG("Class posing is no longer supported");
+	DEBUG_LOG("Please use class_replaceMethod() instead");
 	abort();
 }

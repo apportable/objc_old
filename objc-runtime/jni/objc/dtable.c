@@ -115,6 +115,10 @@ PRIVATE void init_dispatch_tables ()
 
 Class class_getSuperclass(Class);
 
+void __objc_update_dispatch_table_for_class(Class cls)
+{
+
+}
 
 static dtable_t create_dtable_for_class(Class class, dtable_t root_dtable)
 {
@@ -591,8 +595,7 @@ LEGACY void update_dispatch_table_for_class(Class cls)
 	static BOOL warned = NO;
 	if (!warned)
 	{
-		fprintf(stderr, 
-			"Warning: Calling deprecated private ObjC runtime function %s\n", __func__);
+		DEBUG_LOG("Warning: Calling deprecated private ObjC runtime function %s\n", __func__);
 		warned = YES;
 	}
 	objc_update_dtable_for_class(cls);

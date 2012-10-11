@@ -58,6 +58,7 @@ LOCAL_CFLAGS    +=  \
                     -Iobjc \
                     -Iobjc/Headers \
                     -Iobjc/Headers/Additions \
+                    -Iobjc/jemalloc \
 
 LOCAL_CFLAGS    +=  \
                     -DANDROID \
@@ -77,6 +78,14 @@ LOCAL_CFLAGS    +=  \
                     -fno-short-enums \
                     -D__ANDROID__  \
                     -DAPPORTABLE \
+                    -DMOZ_MEMORY \
+                    -DMOZ_MEMORY_ANDROID \
+                    -DMOZ_MEMORY_LINUX \
+
+#debug malloc
+ifneq ($(BUILD), release)
+	LOCAL_CFLAGS +=  -DMALLOC_DEBUG
+endif
 
 ifeq ($(TARGET_ARCH_ABI),x86)
 LOCAL_CFLAGS    +=  \
@@ -159,6 +168,8 @@ LOCAL_SRC_FILES :=  \
 	blocks/runtime.o \
     blocks/data.o \
 	toydispatch.o \
+	jemalloc/jemalloc.o \
+    jemalloc/extra_malloc.o \
 
 ifeq ($(EFENCE),yes)
 LOCAL_SRC_FILES += \
@@ -180,6 +191,22 @@ OBJECTS:=$(LOCAL_SRC_FILES)
 
 CXX_SYSTEM = -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/include/ \
              -isystem $(ANDROID_NDK_ROOT)/sources/cxx-stl/gnu-libstdc++/libs/$(TARGET_ARCH_ABI)/include/ \
+
+LOCAL_LDLIBS += \
+	-Wl,--wrap,malloc \
+	-Wl,--wrap,memalign \
+	-Wl,--wrap,posix_memalign \
+	-Wl,--wrap,valloc \
+	-Wl,--wrap,calloc \
+	-Wl,--wrap,realloc \
+	-Wl,--wrap,free \
+	-Wl,--wrap,malloc_usable_size \
+	-Wl,--wrap,strdup \
+	-Wl,--wrap,strndup \
+	-Wl,--wrap,_Znwj \
+	-Wl,--wrap,_Znaj \
+	-Wl,--wrap,_ZdlPv \
+	-Wl,--wrap,_ZdaPv \
 
 ifeq ($(TARGET_ARCH_ABI),x86)
   LD=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-x86

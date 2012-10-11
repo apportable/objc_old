@@ -5,6 +5,11 @@
 #import "dtable.h"
 #include <assert.h>
 
+extern void *_Block_copy(const void *aBlock);
+extern void *_Block_retain(const void *aBlock);
+extern void _Block_release(const void *aBlock);
+
+
 static struct objc_class __NSBlock;
 
 static struct objc_class *_NSBlock = &__NSBlock;
@@ -33,9 +38,7 @@ static void *_NSBlockRetain(void *src, SEL _cmd) {
 }
 
 static id _NSBlockDescription(void *src, SEL _cmd) {
-	
-	const char *description = _Block_dump(src);
-	// return [[[NSString alloc] initWithUTF8String:description] autorelease];
+	const char *description = "Block";
 	static Class NSStringClass = NULL;
 	static IMP NSStringAlloc = NULL;
 	static IMP NSStringInitWithUTF8String = NULL;
