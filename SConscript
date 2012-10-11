@@ -56,7 +56,7 @@ sources = [
     'objc-runtime/jni/objc/jemalloc/jemalloc.c',
     'objc-runtime/jni/objc/jemalloc/extra_malloc.c',
     {'source' : 'objc-runtime/jni/objc/objc_msgSend.arm.S', 'env' : {'TARGET_ARCH' : 'arm'}},
-    {'source' : 'objc-runtime/jni/objc/objc_msgSend.x86-32.S', 'env' : {'TARGET_ARCH' : 'x86'}},
+    # {'source' : 'objc-runtime/jni/objc/objc_msgSend.x86-32.S', 'env' : {'TARGET_ARCH' : 'x86'}},
     {'source' : 'objc-runtime/jni/objc/extra/ffs.c', 'env' : {'TARGET_ARCH' : 'x86', 'TARGET_OS' : 'android'}},
     {'source' : 'objc-runtime/jni/objc/extra/atexit.c', 'env' : {'TARGET_ARCH' : 'x86', 'TARGET_OS' : 'android'}},
 ]

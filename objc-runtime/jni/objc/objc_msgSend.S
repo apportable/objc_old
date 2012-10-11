@@ -1,6 +1,6 @@
-#if __x86_64
+#if __x86_64__
 #include "objc_msgSend.x86-64.S"
-#elif __i386
+#elif __i386__
 #include "objc_msgSend.x86-32.S"
 #elif __arm__
 #include "objc_msgSend.arm.S"
