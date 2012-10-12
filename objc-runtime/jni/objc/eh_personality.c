@@ -155,7 +155,7 @@ void objc_exception_throw(id object)
 		_objc_unexpected_exception(object);
 	}
 	fprintf(stderr, "Throw returned %d\n",(int) err);
-	abort();
+	//abort();
 }
 
 static Class get_type_table_entry(struct _Unwind_Context *context,

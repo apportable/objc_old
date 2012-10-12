@@ -51,7 +51,7 @@ ifeq ($(CHECK_ILL_OBJECTS), yes)
 LOCAL_CFLAGS += -DCHECK_ILL_OBJECTS
 endif
 
-LOCAL_OBJCFLAGS += -ferror-limit=5 -fblocks -DNS_BLOCKS_AVAILABLE
+LOCAL_OBJCFLAGS += -ferror-limit=5 -fblocks -frtti -fexceptions -DNS_BLOCKS_AVAILABLE
 
 
 LOCAL_CFLAGS    +=  \
@@ -81,6 +81,8 @@ LOCAL_CFLAGS    +=  \
                     -DMOZ_MEMORY \
                     -DMOZ_MEMORY_ANDROID \
                     -DMOZ_MEMORY_LINUX \
+                    -frtti \
+                    -fexceptions \
 
 #debug malloc
 ifneq ($(BUILD), release)
@@ -183,9 +185,6 @@ ifeq ($(TRACK_OBJC_ALLOCATIONS),yes)
 LOCAL_SRC_FILES += track.o
 
 endif
-
-# libunwind stubs
-LOCAL_SRC_FILES += unwind_stubs.o
 
 OBJECTS:=$(LOCAL_SRC_FILES)
 
