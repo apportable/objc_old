@@ -136,10 +136,6 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 
 	if (UNLIKELY(*receiver == nil))
 	{
-		if (UNLIKELY((*receiver)->isa == 0)) {
-			DEBUG_BREAK(); //race?
-			return &nil_slot;
-		}
 		// Return the correct kind of zero, depending on the type encoding.
 		if (selector->types)
 		{
@@ -160,6 +156,10 @@ Slot_t objc_msg_lookup_sender(id *receiver, SEL selector, id sender)
 		return &nil_slot;
 	}
 
+	if (UNLIKELY((*receiver)->isa == 0)) {
+		DEBUG_BREAK(); //race?
+		return &nil_slot;
+	}
 
 
 	/*
