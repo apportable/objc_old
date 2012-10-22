@@ -78,6 +78,7 @@ LOCAL_CFLAGS    +=  \
                     -fno-short-enums \
                     -D__ANDROID__  \
                     -DAPPORTABLE \
+                    -D__BUILT_WITH_MAKEFILE_SYSTEM__ \
                     -DMOZ_MEMORY \
                     -DMOZ_MEMORY_ANDROID \
                     -DMOZ_MEMORY_LINUX \
