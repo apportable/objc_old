@@ -208,6 +208,9 @@ LOCAL_LDLIBS += \
 	-Wl,--wrap,_Znaj \
 	-Wl,--wrap,_ZdlPv \
 	-Wl,--wrap,_ZdaPv \
+  -Wl,--wrap,exit \
+  -Wl,--wrap,pthread_create \
+  -Wl,--wrap,pthread_exit \
 
 ifeq ($(TARGET_ARCH_ABI),x86)
   LD=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-x86
