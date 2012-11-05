@@ -14,7 +14,20 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <sys/types.h>
-#include "Availability.h"
+
+#ifdef STRICT_MACOS_X
+#    define OBJC_NONPORTABLE __attribute__((error("Function not supported by the Apple runtime")))
+#else
+#    define OBJC_NONPORTABLE
+#endif
+
+#ifdef ERROR_UNSUPPORTED_RUNTIME_FUNCTIONS
+#    define OBJC_GNUSTEP_RUNTIME_UNSUPPORTED(x) \
+     __attribute__((error(x " not supported by this runtime")))
+#else
+#    define OBJC_GNUSTEP_RUNTIME_UNSUPPORTED(x)
+#endif
+
 
 #if defined(__cplusplus)
 extern "C" {

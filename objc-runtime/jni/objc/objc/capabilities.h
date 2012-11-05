@@ -12,12 +12,12 @@
  * although they are present in the header and understood by the runtime, they
  * may not be supported by the installed runtime.  
  */
-#include "Availability.h"
+
+#include <objc/runtime.h>
 
 #ifndef __GNUSTEP_RUNTIME__
 #	define __GNUSTEP_RUNTIME__
 #endif
-
 
 /**
  * The runtime supports zero-cost exceptions.  
