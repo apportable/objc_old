@@ -51,7 +51,7 @@ ifeq ($(CHECK_ILL_OBJECTS), yes)
 LOCAL_CFLAGS += -DCHECK_ILL_OBJECTS
 endif
 
-LOCAL_OBJCFLAGS += -ferror-limit=5 -fblocks -frtti -fexceptions -DNS_BLOCKS_AVAILABLE
+LOCAL_OBJCFLAGS += -ferror-limit=5 -fblocks -DNS_BLOCKS_AVAILABLE
 
 
 LOCAL_CFLAGS    +=  \
@@ -78,12 +78,9 @@ LOCAL_CFLAGS    +=  \
                     -fno-short-enums \
                     -D__ANDROID__  \
                     -DAPPORTABLE \
-                    -D__BUILT_WITH_MAKEFILE_SYSTEM__ \
                     -DMOZ_MEMORY \
                     -DMOZ_MEMORY_ANDROID \
                     -DMOZ_MEMORY_LINUX \
-                    -frtti \
-                    -fexceptions \
 
 #debug malloc
 ifneq ($(BUILD), release)
@@ -141,6 +138,7 @@ endif
 
 
 LOCAL_SRC_FILES :=  \
+<<<<<<< HEAD
 	gc_none.o \
 	NSBlocks.o \
 	Protocol2.o \
@@ -171,8 +169,36 @@ LOCAL_SRC_FILES :=  \
 	blocks/runtime.o \
     blocks/data.o \
 	toydispatch.o \
-	jemalloc/jemalloc.o \
-    jemalloc/extra_malloc.o \
+=======
+                    Protocol2.o \
+                    abi_version.o \
+                    caps.o \
+                    category_loader.o \
+                    class_table.o \
+                    dtable.o \
+                    eh_personality.o \
+                    encoding2.o \
+                    hooks.o \
+                    ivar.o \
+                    legacy_malloc.o \
+                    loader.o \
+                    mutation.o \
+                    properties.o \
+                    protocol.o \
+                    runtime.o \
+                    sarray2.o \
+                    selector_table.o \
+                    sendmsg2.o \
+                    statics_loader.o \
+                    sync.o \
+                    associations.o \
+                    NSBlocks.o \
+                    blocks/runtime.o \
+                    blocks/data.o \
+                    ill_object.o \
+                    jemalloc/jemalloc.o \
+                    jemalloc/extra_malloc.o \
+>>>>>>> master
 
 ifeq ($(EFENCE),yes)
 LOCAL_SRC_FILES += \
@@ -186,6 +212,9 @@ ifeq ($(TRACK_OBJC_ALLOCATIONS),yes)
 LOCAL_SRC_FILES += track.o
 
 endif
+
+# libunwind stubs
+LOCAL_SRC_FILES += unwind_stubs.o
 
 OBJECTS:=$(LOCAL_SRC_FILES)
 
@@ -207,9 +236,6 @@ LOCAL_LDLIBS += \
 	-Wl,--wrap,_Znaj \
 	-Wl,--wrap,_ZdlPv \
 	-Wl,--wrap,_ZdaPv \
-  -Wl,--wrap,exit \
-  -Wl,--wrap,pthread_create \
-  -Wl,--wrap,pthread_exit \
 
 ifeq ($(TARGET_ARCH_ABI),x86)
   LD=$(ANDROID_NDK_ROOT)/toolchains/x86-4.4.3/prebuilt/$(HOST_OS)-$(HOST_ARCH)/bin/i686-android-linux-g++ --sysroot=$(ANDROID_NDK_ROOT)/platforms/android-$(ANDROID_API_LEVEL)/arch-x86
