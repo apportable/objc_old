@@ -125,7 +125,7 @@ __BEGIN_DECLS
  * Run time feature test.  This function returns 1 if the runtime supports the
  * specified feature or 0 if it does not.
  */
-int objc_test_capability(int x) OBJC_NONPORTABLE;
+int objc_test_capability(int x);
 __END_DECLS
 
 #endif //__GNUSTEP_CAPABILITIES_H__

@@ -5,11 +5,14 @@
 #include "lock.h"
 #include <stdlib.h>
 
+extern const char *copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
+
 #define BUFFER_TYPE struct objc_protocol_list
 #include "buffer.h"
 
 // Get the functions for string hashing
 #include "string_hash.h"
+
 
 static int protocol_compare(const char *name,
                             const struct objc_protocol2 *protocol)
@@ -491,7 +494,6 @@ Protocol*__unsafe_unretained* objc_copyProtocolList(unsigned int *outCount)
 	return p;
 }
 
-
 Protocol *objc_allocateProtocol(const char *name)
 {
 	if (objc_getProtocol(name) != NULL) { return NULL; }
@@ -499,6 +501,7 @@ Protocol *objc_allocateProtocol(const char *name)
 	p->name = strdup(name);
 	return p;
 }
+
 void objc_registerProtocol(Protocol *proto)
 {
 	if (NULL == proto) { return; }
@@ -508,6 +511,7 @@ void objc_registerProtocol(Protocol *proto)
 	proto->isa = ObjC2ProtocolClass;
 	protocol_table_insert((struct objc_protocol2*)proto);
 }
+
 void protocol_addMethodDescription(Protocol *aProtocol,
                                    SEL name,
                                    const char *types,
@@ -556,6 +560,7 @@ void protocol_addMethodDescription(Protocol *aProtocol,
 	list->methods[index].name = sel_getName(name);
 	list->methods[index].types= types;
 }
+
 void protocol_addProtocol(Protocol *aProtocol, Protocol *addition)
 {
 	if ((NULL == aProtocol) || (NULL == addition)) { return; }
@@ -574,6 +579,7 @@ void protocol_addProtocol(Protocol *aProtocol, Protocol *addition)
 	}
 	proto->protocol_list->list[proto->protocol_list->count-1] = (Protocol2*)addition;
 }
+
 void protocol_addProperty(Protocol *aProtocol,
                           const char *name,
                           const objc_property_attribute_t *attributes,
@@ -581,34 +587,38 @@ void protocol_addProperty(Protocol *aProtocol,
                           BOOL isRequiredProperty,
                           BOOL isInstanceProperty)
 {
-	if ((NULL == aProtocol) || (NULL == name)) { return; }
-	if (nil != aProtocol->isa) { return; }
-	if (!isInstanceProperty) { return; }
 	Protocol2 *proto = (Protocol2*)aProtocol;
-	struct objc_property_list **listPtr;
-	if (isRequiredProperty)
-	{
-		listPtr = &proto->properties;
+	if ((NULL == proto) || (NULL == name)) { return; }
+	if (nil != proto->isa) { return; }
+
+	objc_property_t old = protocol_getProperty((Protocol *)proto, name, isRequiredProperty, isInstanceProperty);
+	if (old) { // replacing
+		LOCK_RUNTIME_FOR_SCOPE();
+
+		//Apple cheats by checking malloc_size to see if the string was malloced or if it mapped. This is the best we can do.a
+		if (malloc_usable_size((char *)old->attributes) != 0)
+		{
+			free((char *)old->attributes);
+		}
+		old->attributes = copyPropertyAttributeString(attributes, attributeCount);
 	}
-	else
-	{
-		listPtr = &proto->optional_properties;
+	else { //new
+		LOCK_RUNTIME_FOR_SCOPE();
+		struct objc_property_list *l = calloc(1,sizeof(struct objc_property_list)
+			+ sizeof(struct objc_property));
+		l->count = 1;
+		l->properties[0].name = strdup(name);
+		l->properties[0].attributes = copyPropertyAttributeString(attributes, attributeCount);
+		if (isRequiredProperty)
+		{
+			l->next = proto->properties;
+			proto->properties = l;
+		}
+		else
+		{
+			l->next = proto->optional_properties;	
+			proto->optional_properties = l;
+		}
 	}
-	if (NULL == *listPtr)
-	{
-		*listPtr = calloc(1, sizeof(struct objc_property_list) + sizeof(struct objc_property));
-		(*listPtr)->count = 1;
-	}
-	else
-	{
-		(*listPtr)->count++;
-		*listPtr = realloc(*listPtr, sizeof(struct objc_property_list) +
-				sizeof(struct objc_property) * (*listPtr)->count);
-	}
-	struct objc_property_list *list = *listPtr;
-	int index = list->count-1;
-	struct objc_property p = propertyFromAttrs(attributes, attributeCount);
-	p.name = strdup(name);
-	memcpy(&(list->properties[index]), &p, sizeof(p));
 }
 

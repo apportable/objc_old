@@ -21,6 +21,10 @@
  * @APPLE_LICENSE_HEADER_END@
  */
 
+#include <objc/runtime.h>
+#include <string.h>
+#include <assert.h>
+
 extern const char *copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
 extern objc_property_attribute_t *copyPropertyAttributeList(const char *attrs, unsigned int *outCount);
 extern char *copyPropertyAttributeValue(const char *attrs, const char *name);

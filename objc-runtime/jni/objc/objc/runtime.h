@@ -1046,11 +1046,7 @@ int objc_set_apple_compatible_objcxx_exceptions(int newValue) OBJC_NONPORTABLE;
 
 #include "runtime-deprecated.h"
 
-SEL _property_getSetterSelector(objc_property_t property);
-SEL _property_getGetterSelector(objc_property_t property);
 
-const char *_property_getSetterTypes(objc_property_t property);
-const char *_property_getGetterTypes(objc_property_t property);
 
 #ifdef __cplusplus
 }
