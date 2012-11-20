@@ -3,11 +3,12 @@
 #include "objc/runtime.h"
 #include "class.h"
 #include "ivar.h"
+#include "visibility.h"
 
 ptrdiff_t objc_alignof_type(const char *);
 ptrdiff_t objc_sizeof_type(const char *);
 
-void objc_compute_ivar_offsets(Class class)
+PRIVATE void objc_compute_ivar_offsets(Class class)
 {
 	int i = 0;
 	/* If this class was compiled with support for late-bound ivars, the
@@ -88,6 +89,52 @@ void objc_compute_ivar_offsets(Class class)
 		{
 			return;
 		}
-		// abort();
+
+		/* Panic if this class has an instance variable that overlaps the
+		* superclass. */
+		DEBUG_LOG("Error: Instance variables in %s overlap superclass %s.  ",
+			class->name, super->name);
+		DEBUG_LOG("Offset of first instance variable, %s, is %d.  ",
+			class->ivars->ivar_list[0].name, start);
+		DEBUG_LOG("Last instance variable in superclass, %s, ends at offset %d.  ",
+			ivar->name, ivar->offset +
+			(int)objc_sizeof_type(ivar->type));
+		DEBUG_LOG("This probably means that you are subclassing a"
+			"class from a library, which has changed in a binary-incompatible"
+			"way.\n");
+		abort();
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Public API functions
+////////////////////////////////////////////////////////////////////////////////
+
+void object_setIvar(id object, Ivar ivar, id value)
+{
+	char *addr = (char*)object;
+	addr += ivar_getOffset(ivar);
+	*(id*)addr = value;
+}
+
+Ivar object_setInstanceVariable(id obj, const char *name, void *value)
+{
+	Ivar ivar = class_getInstanceVariable(object_getClass(obj), name);
+	object_setIvar(obj, ivar, value);
+	return ivar;
+}
+
+id object_getIvar(id object, Ivar ivar)
+{
+	return *(id*)(((char*)object) + ivar_getOffset(ivar));
+}
+
+Ivar object_getInstanceVariable(id obj, const char *name, void **outValue)
+{
+	Ivar ivar = class_getInstanceVariable(object_getClass(obj), name);
+	if (NULL != outValue)
+	{
+		*outValue = object_getIvar(obj, ivar);
+	}
+	return ivar;
 }

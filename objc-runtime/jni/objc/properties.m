@@ -1,142 +1,80 @@
 #include "objc/runtime.h"
-#include "objc/ill_object.h"
+#include "objc/objc-arc.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include "class.h"
 #include "properties.h"
-#include "uthash.h"
-#include <pthread.h>
+#include "spinlock.h"
+#include "visibility.h"
+#include "nsobject.h"
+#include "gc_ops.h"
+#include "lock.h"
 
-// Since the compiler now returns extra information in
-// the name and attribute labels
-struct objc_property_extra {
-    objc_property_t property;
-    char *name;
-    char *attributes;
-    UT_hash_handle hh;
-};
+extern const char *copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
+extern objc_property_attribute_t *copyPropertyAttributeList(const char *attrs, unsigned int *outCount);
+extern char *copyPropertyAttributeValue(const char *attrs, const char *name);
 
-static struct objc_property_extra* prop_extras = NULL;
-
-
-typedef void *objcRefLock[10]; // Big enough for holding a pthread_rwlock_t
-objcRefLock _objcPropertyLock;
-
-extern int (*_objcRefRLock)(objcRefLock *lock);
-extern int (*_objcRefRUnlock)(objcRefLock *lock);
-extern int (*_objcRefWLock)(objcRefLock *lock);
-extern int (*_objcRefWUnlock)(objcRefLock *lock);
-extern int (*_objcRefLockFatal)(const char *err);
-
-#define HASH_RLOCK() if (_objcRefRLock != NULL && _objcRefLockFatal != NULL && _objcRefRLock(&_objcPropertyLock) != 0) _objcRefLockFatal("can't get rdlock")
-#define HASH_RUNLOCK() if (_objcRefRUnlock != NULL) _objcRefRUnlock(&_objcPropertyLock)
-#define HASH_WLOCK() if (_objcRefWLock != NULL && _objcRefLockFatal != NULL && _objcRefWLock(&_objcPropertyLock) != 0) _objcRefLockFatal("can't get wrlock")
-#define HASH_WUNLOCK() if (_objcRefWUnlock != NULL) _objcRefWUnlock(&_objcPropertyLock)
-
-#ifdef __MINGW32__
-#include <windows.h>
-static unsigned sleep(unsigned seconds)
-{
-	Sleep(seconds*1000);
-	return 0;
-}
-#endif
-
-// Subset of NSObject interface needed for properties.
-@interface NSObject {}
-- (id)retain;
-- (id)copy;
-- (id)autorelease;
-- (void)release;
-@end
+PRIVATE int spinlocks[spinlock_count];
 
 /**
- * Number of spinlocks.  This allocates one page on 32-bit platforms.
+ * Public function for getting a property.  
  */
-#define spinlock_count (1<<10)
-const int spinlock_mask = spinlock_count - 1;
-/**
- * Integers used as spinlocks for atomic property access.
- */
-static int spinlocks[spinlock_count];
-/**
- * Get a spin lock from a pointer.  We want to prevent lock contention between
- * properties in the same object - if someone is stupid enough to be using
- * atomic property access, they are probably stupid enough to do it for
- * multiple properties in the same object.  We also want to try to avoid
- * contention between the same property in different objects, so we can't just
- * use the ivar offset.
- */
-static inline int *lock_for_pointer(void *ptr)
-{
-	intptr_t hash = (intptr_t)ptr;
-	// Most properties will be pointers, so disregard the lowest few bits
-	hash >>= sizeof(void*) == 4 ? 2 : 8;
-	intptr_t low = hash & spinlock_mask;
-	hash >>= 16;
-	hash |= low;
-	return spinlocks + (hash & spinlock_mask);
-}
-
-inline static void unlock_spinlock(int *spinlock)
-{
-	*spinlock = 0;
-}
-inline static void lock_spinlock(int *spinlock)
-{
-	int count = 0;
-	// Set the spin lock value to 1 if it is 0.
-	while(!__sync_bool_compare_and_swap(spinlock, 0, 1))
-	{
-		count++;
-		if (0 == count % 10)
-		{
-			// If it is already 1, let another thread play with the CPU for a
-			// bit then try again.
-			sleep(0);
-		}
-	}
-}
-
-id objc_getProperty(id obj, SEL _cmd, int offset, BOOL isAtomic)
+id objc_getProperty(id obj, SEL _cmd, ptrdiff_t offset, BOOL isAtomic)
 {
 	if (nil == obj) { return nil; }
 	char *addr = (char*)obj;
 	addr += offset;
+	if (isGCEnabled)
+	{
+		return *(id*)addr;
+	}
 	id ret;
 	if (isAtomic)
 	{
-		int *lock = lock_for_pointer(addr);
+		volatile int *lock = lock_for_pointer(addr);
 		lock_spinlock(lock);
 		ret = *(id*)addr;
+		ret = objc_retain(ret);
 		unlock_spinlock(lock);
+		ret = objc_autoreleaseReturnValue(ret);
 	}
 	else
 	{
 		ret = *(id*)addr;
+		ret = objc_retainAutoreleaseReturnValue(ret);
 	}
 	return ret;
 }
 
-void objc_setProperty(id obj, SEL _cmd, int offset, id arg, BOOL isAtomic, BOOL isCopy)
+void objc_setProperty(id obj, SEL _cmd, ptrdiff_t offset, id arg, BOOL isAtomic, BOOL isCopy)
 {
 	if (nil == obj) { return; }
+	char *addr = (char*)obj;
+	addr += offset;
+
+	if (isGCEnabled)
+	{
+		if (isCopy)
+		{
+			arg = [arg copy];
+		}
+		*(id*)addr = arg;
+		return;
+	}
 	if (isCopy)
 	{
 		arg = [arg copy];
 	}
 	else
 	{
-		arg = [arg retain];
+		arg = objc_retain(arg);
 	}
-	char *addr = (char*)obj;
-	addr += offset;
 	id old;
 	if (isAtomic)
 	{
-		int *lock = lock_for_pointer(addr);
+		volatile int *lock = lock_for_pointer(addr);
 		lock_spinlock(lock);
 		old = *(id*)addr;
 		*(id*)addr = arg;
@@ -147,12 +85,84 @@ void objc_setProperty(id obj, SEL _cmd, int offset, id arg, BOOL isAtomic, BOOL 
 		old = *(id*)addr;
 		*(id*)addr = arg;
 	}
-	if (CHECK_ILL_OBJECT_WHEN(old, "inside objc_setProperty()"))
-	{
-		return;
-	}
-	[old release];
+	objc_release(old);
 }
+
+/**
+ * Structure copy function.  This is provided for compatibility with the Apple
+ * APIs (it's an ABI function, so it's semi-public), but it's a bad design so
+ * it's not used.  The problem is that it does not identify which of the
+ * pointers corresponds to the object, which causes some excessive locking to
+ * be needed.
+ */
+void objc_copyPropertyStruct(void *dest,
+                             void *src,
+                             ptrdiff_t size,
+                             BOOL atomic,
+                             BOOL strong)
+{
+	if (atomic)
+	{
+		volatile int *lock = lock_for_pointer(src);
+		volatile int *lock2 = lock_for_pointer(src);
+		lock_spinlock(lock);
+		lock_spinlock(lock2);
+		memcpy(dest, src, size);
+		unlock_spinlock(lock);
+		unlock_spinlock(lock2);
+	}
+	else
+	{
+		memcpy(dest, src, size);
+	}
+}
+
+/**
+ * Get property structure function.  Copies a structure from an ivar to another
+ * variable.  Locks on the address of src.
+ */
+void objc_getPropertyStruct(void *dest,
+                            void *src,
+                            ptrdiff_t size,
+                            BOOL atomic,
+                            BOOL strong)
+{
+	if (atomic)
+	{
+		volatile int *lock = lock_for_pointer(src);
+		lock_spinlock(lock);
+		memcpy(dest, src, size);
+		unlock_spinlock(lock);
+	}
+	else
+	{
+		memcpy(dest, src, size);
+	}
+}
+
+/**
+ * Set property structure function.  Copes a structure to an ivar.  Locks on
+ * dest.
+ */
+void objc_setPropertyStruct(void *dest,
+                            void *src,
+                            ptrdiff_t size,
+                            BOOL atomic,
+                            BOOL strong)
+{
+	if (atomic)
+	{
+		volatile int *lock = lock_for_pointer(dest);
+		lock_spinlock(lock);
+		memcpy(dest, src, size);
+		unlock_spinlock(lock);
+	}
+	else
+	{
+		memcpy(dest, src, size);
+	}
+}
+
 
 objc_property_t class_getProperty(Class cls, const char *name)
 {
@@ -167,7 +177,7 @@ objc_property_t class_getProperty(Class cls, const char *name)
 		for (int i=0 ; i<properties->count ; i++)
 		{
 			objc_property_t p = &properties->properties[i];
-			if (strcmp(property_getName(p), name) == 0)
+			if (strcmp(p->name, name) == 0)
 			{
 				return p;
 			}
@@ -181,6 +191,7 @@ objc_property_t class_getProperty(Class cls, const char *name)
 
 	return NULL;
 }
+
 objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 {
 	if (Nil == cls || !objc_test_class_flag(cls, objc_class_flag_new_abi))
@@ -202,169 +213,115 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 	{
 		return NULL;
 	}
-	objc_property_t *list = calloc(sizeof(objc_property_t), count);
+	objc_property_t *list = calloc(count,sizeof(objc_property_t));
 	unsigned int out = 0;
 	for (struct objc_property_list *l=properties ; NULL!=l ; l=l->next)
 	{
 		for (int i=0 ; i<properties->count ; i++)
 		{
-			list[out++] = &l->properties[i];
+			list[out] = &l->properties[i];
 		}
 	}
 	return list;
 }
 
-/* Function returns resulting string size and optionally makes string
- *  in 'attrs' buffer. First call with 'attrs' being NULL, allocate
- *  memory and call again.
- */
-static size_t makeAttributeString(objc_property_t property, char *attrs) {
-	// Create the attr string
-	// Format of property attributes on iOS
-
-	// T for type name, Example: T@"NSString"
-	// & for retain
-	// N for nonatomic
-	// G for getter, Example: Gval
-	// S for setter, Example: SsetVal:
-	// V for backing iVar, Example: V_val
-
-	// Start with the size for terminator.
-	size_t size = 1;
-
-	#define ATTRS_STRCAT(string) \
-		size += strlen(string); \
-		if (attrs) attrs = strcat(attrs, string)
-	#define ATTRS_STRNCAT(string, length) \
-		size += length; \
-		if (attrs) attrs = strncat(attrs, string, length)
-
-	// Prepare buffer for strcats.
-	if (attrs) {
-		*attrs = 0;
-	}
-
-	ATTRS_STRCAT("T");
-
-	const char *first = strchr(property->name, '|');
-	const char *last = strrchr(property->name, '|');
-
-	if (first && last) {
-		ATTRS_STRNCAT(first + 1, last - first - 1);
-	}
-
-	// & for retain
-	if (!(property->attributes & OBJC_PR_assign)) {
-		ATTRS_STRCAT(",&");
-	}
-
-	if (property->attributes & OBJC_PR_nonatomic) {
-		ATTRS_STRCAT(",N");
-	}
-
-	if (property->attributes & OBJC_PR_getter) {
-		ATTRS_STRCAT(",G");
-		if (property->getter_name != NULL)
-		{
-			ATTRS_STRCAT(property->getter_name);
-		}
-		else
-		{
-			DEBUG_LOG("Property name has invalid getter_name!");
-		}
-	}
-
-	if(property->attributes & OBJC_PR_setter) {
-		ATTRS_STRCAT(",S");
-		if (property->setter_name != NULL)
-		{
-			ATTRS_STRCAT(property->setter_name);
-		}
-		else
-		{
-			DEBUG_LOG("Property name has invalid setter_name!");
-		}
-	}
-
-	ATTRS_STRCAT(",V");
-
-	if (last) {
-		ATTRS_STRCAT(last + 1);
-	}
-
-	return size;
-
-	#undef ATTRS_STRCAT
-	#undef ATTRS_STRNCAT
-}
-
-struct objc_property_extra *property_createExtras(objc_property_t property) {
-
-	struct objc_property_extra *entry = (struct objc_property_extra *)malloc(sizeof(struct objc_property_extra));
-	entry->property = property;
-
-	// 1. Create the name
-	const char *c = strchr(property->name, '|');
-	if (c != NULL) {
-		entry->name = strndup(property->name, c - property->name);
-	} else {
-		entry->name = strdup(property->name);
-	}
-
-	// 2. Create the attr string
-	size_t attrsSize = makeAttributeString(property, NULL);
-	char *attrs = malloc(attrsSize);
-	makeAttributeString(property, attrs);
-	entry->attributes = attrs;
-
-	return entry;
-}
-
-
-
 const char *property_getName(objc_property_t property)
 {
-	if(property == NULL) {
-		DEBUG_LOG("Property name requested on null property");
-		return "";
-	}
+	if (NULL == property) { return NULL; }
 
-	struct objc_property_extra* entry = NULL;
-	HASH_WLOCK();
-	HASH_FIND_PTR(prop_extras, &property, entry);
-	if (entry == NULL) {
-		entry = property_createExtras(property);
-    	HASH_ADD_PTR(prop_extras, property, entry);
+	const char *name = property->name;
+	if (name[0] == 0)
+	{
+		name += name[1];
 	}
-	HASH_WUNLOCK();
-	return entry->name;
+	return name;
 }
+
+PRIVATE size_t lengthOfTypeEncoding(const char *types);
 
 const char *property_getAttributes(objc_property_t property)
 {
-	struct objc_property_extra* entry = NULL;
-	HASH_WLOCK();
-	HASH_FIND_PTR(prop_extras, &property, entry);
-	if (entry == NULL) {
-		entry = property_createExtras(property);
-    	HASH_ADD_PTR(prop_extras, property, entry);
+	if (!property) { return NULL; }
+	return property->attributes;
+}
+
+objc_property_attribute_t *property_copyAttributeList(objc_property_t property,
+                                                      unsigned int *outCount)
+{
+	if (property == NULL || property->attributes == NULL) {
+		if (outCount)
+			*outCount = 0;
+		return NULL;
 	}
-	HASH_WUNLOCK();
-	return entry->attributes;
+
+	LOCK_RUNTIME_FOR_SCOPE();
+	objc_property_attribute_t *result;
+	result = copyPropertyAttributeList(property->attributes, outCount);
+	return result;
 }
 
-SEL _property_getSetterSelector(objc_property_t property) {
-	return sel_registerName(property->setter_name);
+BOOL _class_addProperty(Class cls,
+                       const char *name,
+                       const objc_property_attribute_t *attributes,
+                       unsigned int attributeCount,
+                       BOOL replace) {
+	if (cls == Nil || name == NULL) {
+		return NO;
+	}
+
+	objc_property_t old = class_getProperty(cls, name);
+	if (old && !replace) {
+		return NO;
+	}
+	else if (old) { // replacing
+		LOCK_RUNTIME_FOR_SCOPE();
+
+		//Apple cheats by checking malloc_size to see if the string was malloced or if it mapped. This is the best we can do.a
+		if (malloc_usable_size((char *)old->attributes) != 0)
+		{
+			free((char *)old->attributes);
+		}
+		old->attributes = copyPropertyAttributeString(attributes, attributeCount);
+		return YES;
+	}
+	else { //new
+		LOCK_RUNTIME_FOR_SCOPE();
+		struct objc_property_list *l = calloc(1,sizeof(struct objc_property_list)
+			+ sizeof(struct objc_property));
+		l->count = 1;
+		l->properties[0].name = strdup(name);
+		l->properties[0].attributes = copyPropertyAttributeString(attributes, attributeCount);
+		l->next = cls->properties;
+		cls->properties = l;
+		return YES;
+	}
+
 }
 
-SEL _property_getGetterSelector(objc_property_t property) {
-	return sel_registerName(property->getter_name);
+BOOL class_addProperty(Class cls,
+                       const char *name,
+                       const objc_property_attribute_t *attributes, 
+                       unsigned int attributeCount)
+{
+	return _class_addProperty(cls, name, attributes, attributeCount, YES);
 }
 
-const char *_property_getSetterTypes(objc_property_t property) {
-	return property->setter_types;
+void class_replaceProperty(Class cls,
+                           const char *name,
+                           const objc_property_attribute_t *attributes,
+                           unsigned int attributeCount)
+{
+	_class_addProperty(cls, name, attributes, attributeCount, YES);
 }
 
-const char *_property_getGetterTypes(objc_property_t property) {
-	return property->getter_types;
+
+char *property_copyAttributeValue(objc_property_t property,
+                                  const char *attributeName)
+{
+	if (property == NULL || attributeName == NULL || *attributeName == '\0')
+		return NULL;
+
+	LOCK_RUNTIME_FOR_SCOPE();
+	char *result = copyPropertyAttributeValue(property->attributes, attributeName);
+	return result;
 }

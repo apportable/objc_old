@@ -1,15 +1,18 @@
-#include "magic_objects.h"
 #include "objc/runtime.h"
 #include "objc/hooks.h"
+#include "objc/developer.h"
+#include "alias.h"
 #include "class.h"
 #include "method_list.h"
 #include "selector.h"
 #include "lock.h"
+#include "ivar.h"
+#include "dtable.h"
+#include "visibility.h"
 #include <stdlib.h>
 #include <assert.h>
 
 void objc_register_selectors_from_class(Class class);
-void *__objc_uninstalled_dtable;
 void objc_init_protocols(struct objc_protocol_list *protos);
 void objc_compute_ivar_offsets(Class class);
 
@@ -34,13 +37,13 @@ static load_messages_table *load_table;
 
 SEL loadSel;
 
-void objc_init_load_messages_table(void)
+PRIVATE void objc_init_load_messages_table(void)
 {
-	load_table  = load_messages_create(4096);
+	load_messages_initialize(&load_table, 4096);
 	loadSel = sel_registerName("load");
 }
 
-void objc_send_load_message(Class class)
+PRIVATE void objc_send_load_message(Class class)
 {
 	Class meta = class->isa;
 	for (struct objc_method_list *l=meta->methods ; NULL!=l ; l=l->next)
@@ -92,11 +95,20 @@ static class_table_internal_table *class_table;
  */
 static Class unresolved_class_list;
 
+static enum objc_developer_mode_np mode;
+
+void objc_setDeveloperMode_np(enum objc_developer_mode_np newMode)
+{
+	mode = newMode;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Class table manipulation
 ////////////////////////////////////////////////////////////////////////////////
 
-void class_table_insert(Class class)
+PRIVATE Class zombie_class;
+
+PRIVATE void class_table_insert(Class class)
 {
 	if (!objc_test_class_flag(class, objc_class_flag_resolved))
 	{
@@ -107,23 +119,28 @@ void class_table_insert(Class class)
 		class->unresolved_class_next = unresolved_class_list;
 		unresolved_class_list = class;
 	}
+	if ((0 == zombie_class) && (strcmp("NSZombie", class->name) == 0))
+	{
+		zombie_class = class;
+	}
 	class_table_internal_insert(class_table, class);
 }
 
-Class class_table_get_safe(const char *class_name)
+PRIVATE Class class_table_get_safe(const char *class_name)
 {
+	if (NULL == class_name) { return Nil; }
 	return class_table_internal_table_get(class_table, class_name);
 }
 
-Class class_table_next(void **e)
+PRIVATE Class class_table_next(void **e)
 {
 	return class_table_internal_next(class_table,
 			(struct class_table_internal_table_enumerator**)e);
 }
 
-void __objc_init_class_tables(void)
+PRIVATE void init_class_tables(void)
 {
-	class_table = class_table_internal_create(4096);
+	class_table_internal_initialize(&class_table, 4096);
 	objc_init_load_messages_table();
 }
 
@@ -131,7 +148,7 @@ void __objc_init_class_tables(void)
 // Loader functions
 ////////////////////////////////////////////////////////////////////////////////
 
-BOOL objc_resolve_class(Class cls)
+PRIVATE BOOL objc_resolve_class(Class cls)
 {
 	// Skip this if the class is already resolved.
 	if (objc_test_class_flag(cls, objc_class_flag_resolved)) { return YES; }
@@ -149,21 +166,6 @@ BOOL objc_resolve_class(Class cls)
 				return NO;
 			}
 		}
-	}
-
-
-	// Give up if we can't resolve the root class yet...
-	static Class root_class = Nil;
-	if (Nil == root_class)
-	{
-		root_class = (Class)objc_getClass(ROOT_OBJECT_CLASS_NAME);
-		if (Nil == root_class) { return NO; }
-
-		if (cls != root_class && !objc_test_class_flag(root_class, objc_class_flag_resolved))
-		{
-			objc_resolve_class(root_class);
-		}
-		assert(root_class);
 	}
 
 
@@ -185,17 +187,24 @@ BOOL objc_resolve_class(Class cls)
 	cls->unresolved_class_prev = Nil;
 	cls->unresolved_class_next = Nil;
 
+	// The superclass for the metaclass.  This is the metaclass for the
+	// superclass if one exists, otherwise it is the root class itself
+	Class superMeta = Nil;
+	// The metaclass for the metaclass.  This is always the root class's
+	// metaclass.
+	Class metaMeta = Nil;
+
 	// Resolve the superclass pointer
 
-	// If this class has no superclass, use [NS]Object
-	Class super = root_class;
-	Class superMeta = root_class;
-	Class meta = cls->isa;
-
-	if (NULL != cls->super_class)
+	if (NULL == cls->super_class)
+	{
+		superMeta = cls;
+		metaMeta = cls->isa;
+	}
+	else
 	{
 		// Resolve the superclass if it isn't already resolved
-		super = (Class)objc_getClass((char*)cls->super_class);
+		Class super = (Class)objc_getClass((char*)cls->super_class);
 		if (!objc_test_class_flag(super, objc_class_flag_resolved))
 		{
 			objc_resolve_class(super);
@@ -203,18 +212,26 @@ BOOL objc_resolve_class(Class cls)
 		superMeta = super->isa;
 		// Set the superclass pointer for the class and the superclass
 		cls->super_class = super;
+		do
+		{
+			metaMeta = super->isa;
+			super = super->super_class;
+		} while (Nil != super);
 	}
+	Class meta = cls->isa;
 
-	// Don't make the root class a subclass of itself
-	if (cls != super)
+	// Make the root class the superclass of the metaclass (e.g. NSObject is
+	// the superclass of all metaclasses in classes that inherit from NSObject)
+	meta->super_class = superMeta;
+	meta->isa = metaMeta;
+
+	// Don't register root classes as children of anything
+	if (Nil != cls->super_class)
 	{
 		// Set up the class links
-		cls->sibling_class = super->subclass_list;
-		super->subclass_list = cls;
+		cls->sibling_class = cls->super_class->subclass_list;
+		cls->super_class->subclass_list = cls;
 	}
-	// Make the root class the superclass of the metaclass (e.g. NSObject is
-	// the superclass of all metaclasses)
-	meta->super_class = superMeta;
 	// Set up the metaclass links
 	meta->sibling_class = superMeta->subclass_list;
 	superMeta->subclass_list = meta;
@@ -222,8 +239,8 @@ BOOL objc_resolve_class(Class cls)
 	// Mark this class (and its metaclass) as resolved
 	objc_set_class_flag(cls, objc_class_flag_resolved);
 	objc_set_class_flag(cls->isa, objc_class_flag_resolved);
-	cls->isa->isa = (Nil == cls->isa->isa) ? root_class->isa : 
-	                ((Class)objc_getClass((char*)cls->isa->isa))->isa;
+
+
 	// Fix up the ivar offsets
 	objc_compute_ivar_offsets(cls);
 	// Send the +load message, if required
@@ -235,9 +252,9 @@ BOOL objc_resolve_class(Class cls)
 	return YES;
 }
 
-void objc_resolve_class_links(void)
+PRIVATE void objc_resolve_class_links(void)
 {
-	LOCK_UNTIL_RETURN(__objc_runtime_mutex);
+	LOCK_RUNTIME_FOR_SCOPE();
 	Class class = unresolved_class_list;
 	BOOL resolvedClass;
 	do
@@ -258,35 +275,85 @@ void objc_resolve_class_links(void)
 }
 void __objc_resolve_class_links(void)
 {
+	static BOOL warned = NO;
+	if (!warned)
+	{
+		DEBUG_LOG("Warning: Calling deprecated private ObjC runtime function %s\n", __func__);
+		warned = YES;
+	}
 	objc_resolve_class_links();
 }
 
-/**
- * Loads a class.  This function assumes that the runtime mutex is locked.
- */
-void objc_load_class(struct objc_class *class)
+static void reload_class(struct objc_class *class, struct objc_class *old)
 {
-	// The compiler initialises the super class pointer to the name of the
-	// superclass, not the superclass pointer.
-	// Note: With the new ABI, the class pointer is public.  We could,
-	// therefore, directly reference the superclass from the compiler and make
-	// the linker resolve it.  This should be done in the GCC-incompatible ABI.
 	const char *superclassName = (char*)class->super_class;
+	class->super_class = class_table_get_safe(superclassName);
+	// Checking the instance sizes are equal here is a quick-and-dirty test.
+	// It's not actually needed, because we're testing the ivars are at the
+	// same locations next, but it lets us skip those tests if the total size
+	// is different.
+	BOOL equalLayouts = (class->super_class == old->super_class) &&
+		(class->instance_size == old->instance_size);
+	// If either of the classes has an empty ivar list, then the other one must too.
+	if ((NULL == class->ivars) || (NULL == old->ivars))
+	{
+		equalLayouts &= (class->ivars == old->ivars);
+	}
+	else
+	{
+		// If the class sizes are the same, ensure that the ivars have the same
+		// types, names, and offsets.  Note: Renaming an ivar is treated as a
+		// conflict because name changes are often accompanied by semantic
+		// changes.  For example, an object ivar at offset 16 goes from being
+		// called 'delegate' to being called 'view' - we almost certainly don't
+		// want methods that expect to be working with the delegate ivar to
+		// work with the view ivar now!
+		for (int i=0 ; equalLayouts && (i<old->ivars->count) ; i++)
+		{
+			struct objc_ivar *oldIvar = &old->ivars->ivar_list[i];
+			struct objc_ivar *newIvar = &class->ivars->ivar_list[i];
+			equalLayouts &= strcmp(oldIvar->name, newIvar->name) == 0;
+			equalLayouts &= strcmp(oldIvar->type, newIvar->type) == 0;
+			equalLayouts &= (oldIvar->offset == newIvar->offset);
+		}
+	}
 
-	// Work around a bug in some versions of GCC that don't initialize the
-	// class structure correctly.
+	// If the layouts are equal, then we can simply tack the class's method
+	// list on to the front of the old class and update the dtable.
+	if (equalLayouts)
+	{
+		class->methods->next = old->methods;
+		old->methods = class->methods;
+		objc_update_dtable_for_class(old);
+		return;
+	}
+
+	// If we get to here, then we are adding a new class.  This is where things
+	// start to get a bit tricky...
+
+	// Ideally, we'd want to capture the subclass list here.  Unfortunately,
+	// this is not possible because the subclass will contain methods that
+	// refer to ivars in the superclass.
+	//
+	// We can't use the non-fragile ABI's offset facility easily, because we'd
+	// have to have two (or more) offsets for the same ivar.  This gets messy
+	// very quickly.  Ideally, we'd want every class to include ivar offsets
+	// for every single (public) ivar in its superclasses.  These could then be
+	// updated by copies of the class.  Defining a development ABI is something
+	// to consider for a future release.
 	class->subclass_list = NULL;
 
-	// Insert the class into the class table
-	class_table_insert (class);
+	// Replace the old class with this one in the class table.  New lookups for
+	// this class will now return this class.
+	class_table_internal_table_set(class_table, (void*)class->name, class);
 
 	// Register all of the selectors used by this class and its metaclass
 	objc_register_selectors_from_class(class);
 	objc_register_selectors_from_class(class->isa);
 
 	// Set the uninstalled dtable.  The compiler could do this as well.
-	class->dtable = __objc_uninstalled_dtable;
-	class->isa->dtable = __objc_uninstalled_dtable;
+	class->dtable = uninstalled_dtable;
+	class->isa->dtable = uninstalled_dtable;
 
 	// If this is a root class, make the class into the metaclass's superclass.
 	// This means that all instance methods will be available to the class.
@@ -301,13 +368,91 @@ void objc_load_class(struct objc_class *class)
 	}
 }
 
+/**
+ * Loads a class.  This function assumes that the runtime mutex is locked.
+ */
+PRIVATE void objc_load_class(struct objc_class *class)
+{
+	struct objc_class *existingClass = class_table_get_safe(class->name);
+	if (Nil != existingClass)
+	{
+		if (objc_developer_mode_developer != mode)
+		{
+			DEBUG_LOG("Loading two versions of %s.  The class that will be used is undefined",class->name);
+			return;
+		}
+		reload_class(class, existingClass);
+		return;
+	}
+
+	// The compiler initialises the super class pointer to the name of the
+	// superclass, not the superclass pointer.
+	// Note: With the new ABI, the class pointer is public.  We could,
+	// therefore, directly reference the superclass from the compiler and make
+	// the linker resolve it.  This should be done in the GCC-incompatible ABI.
+	const char *superclassName = (char*)class->super_class;
+
+	// Work around a bug in some versions of GCC that don't initialize the
+	// class structure correctly.
+	class->subclass_list = NULL;
+
+	// Insert the class into the class table
+	class_table_insert(class);
+
+	// Register all of the selectors used by this class and its metaclass
+	objc_register_selectors_from_class(class);
+	objc_register_selectors_from_class(class->isa);
+
+	// Set the uninstalled dtable.  The compiler could do this as well.
+	class->dtable = uninstalled_dtable;
+	class->isa->dtable = uninstalled_dtable;
+
+	// If this is a root class, make the class into the metaclass's superclass.
+	// This means that all instance methods will be available to the class.
+	if (NULL == superclassName)
+	{
+		class->isa->super_class = class;
+	}
+
+	if (class->protocols)
+	{
+		objc_init_protocols(class->protocols);
+	}
+}
+
+PRIVATE Class SmallObjectClasses[7];
+
+BOOL objc_registerSmallObjectClass_np(Class class, uintptr_t mask)
+{
+	if ((mask & OBJC_SMALL_OBJECT_MASK) != mask)
+	{
+		return NO;
+	}
+	if (sizeof(void*) == 4)
+	{
+		if (Nil == SmallObjectClasses[0])
+		{
+			SmallObjectClasses[0] = class;
+			return YES;
+		}
+		return NO;
+	}
+	if (Nil != SmallObjectClasses[mask])
+	{
+		return NO;
+	}
+	SmallObjectClasses[mask] = class;
+	return YES;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Public API
 ////////////////////////////////////////////////////////////////////////////////
 
 int objc_getClassList(Class *buffer, int bufferLen)
 {
-	if (buffer == NULL)
+	if (buffer == NULL || bufferLen == 0)
 	{
 		return class_table->table_used;
 	}
@@ -320,6 +465,17 @@ int objc_getClassList(Class *buffer, int bufferLen)
 		buffer[count++] = next;
 	}
 	return count;
+}
+Class *objc_copyClassList(unsigned int *outCount)
+{
+	int count = class_table->table_used;
+	Class *buffer = calloc(sizeof(Class), count);
+	if (NULL != outCount)
+	{
+		*outCount = count;
+	}
+	objc_getClassList(buffer, count);
+	return buffer;
 }
 
 Class class_getSuperclass(Class cls)
@@ -339,6 +495,11 @@ id objc_getClass(const char *name)
 
 	if (nil != class) { return class; }
 
+	// Second chance lookup via @compatibilty_alias:
+	class = (id)alias_getClass(name);
+	if (nil != class) { return class; }
+
+	// Third chance lookup via the hook:
 	if (0 != _objc_lookup_class)
 	{
 		class = (id)_objc_lookup_class(name);
@@ -383,5 +544,7 @@ Class objc_next_class(void **enum_state)
 
 Class class_pose_as(Class impostor, Class super_class)
 {
+	DEBUG_LOG("Class posing is no longer supported");
+	DEBUG_LOG("Please use class_replaceMethod() instead");
 	abort();
 }

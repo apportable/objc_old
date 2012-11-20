@@ -11,7 +11,7 @@
 #define _SARRAY_H_INCLUDED_
 #include <stdint.h>
 #include <stdlib.h>
-#include <assert.h>
+#include "visibility.h"
 
 /**
  * Sparse arrays, used to implement dispatch tables.  Current implementation is
@@ -25,9 +25,27 @@
  */
 typedef struct 
 {
+	/**
+	 * Mask value applied to the index when generating an index in this
+	 * sub-array.
+	 */
 	uint32_t mask;
+	/**
+	 * Number of bits that the masked value should be right shifted by to get
+	 * the index in the subarray.  If this value is greater than zero, then the
+	 * value in the array is another SparseArray*.
+	 */
 	uint32_t shift;
+	/**
+	 * The reference count for this.  Used for copy-on-write.  When making a
+	 * copy of a sparse array, we only copy the root node, and increment the
+	 * reference count of the remaining nodes.  When modifying any leaf node,
+	 * we copy if its reference count is greater than one.
+	 */
 	uint32_t refCount;
+	/**
+	 * The data stored in this sparse array node.
+	 */
 	void ** data;
 } SparseArray;
 
@@ -52,7 +70,7 @@ static inline void* SparseArrayLookup(SparseArray * sarray, uint32_t index)
 	uint32_t i = index;
 	switch (sarray->shift)
 	{
-		default: assert(0 && "broken sarray");
+		default: UNREACHABLE("broken sarray");
 		case 0:
 			return sarray->data[i & 0xff];
 		case 8:
@@ -117,7 +135,5 @@ void * SparseArrayNext(SparseArray * sarray, uint32_t * index);
  * Creates a copy of the sparse array.
  */
 SparseArray *SparseArrayCopy(SparseArray * sarray);
-
-#define PTR_TO_IDX(x) ((uint32_t)(uintptr_t)x)
 
 #endif //_SARRAY_H_INCLUDED_

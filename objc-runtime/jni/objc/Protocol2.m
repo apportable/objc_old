@@ -5,10 +5,6 @@
 #include <string.h>
 
 @implementation Protocol
-+ (void)load
-{
-	objc_clear_class_flag(self, objc_class_flag_plane_aware);
-}
 // FIXME: This needs removing, but it's included for now because GNUstep's
 // implementation of +[NSObject conformsToProtocol:] calls it.
 - (BOOL)conformsTo: (Protocol*)p
@@ -20,17 +16,11 @@
 	return self;
 }
 - (void)release {}
++ (Class)class { return self; }
+- (id)self { return self; }
 @end
-@implementation Protocol2 
-+ (void)load
-{
-	objc_clear_class_flag(self, objc_class_flag_plane_aware);
-}
-@end
+@implementation Protocol2 @end
 
-#ifdef MAYBE_MAKE_PROTOCOLS_CRASH_YOUR_APP
-// Disable this, since some apps crash during the load sequence with this in,
-// and it doesn't appear to break anything.  No promises, though.
 /**
  * This class exists for the sole reason that the legacy GNU ABI did not
  * provide a way of registering protocols with the runtime.  With the new ABI,
@@ -40,6 +30,5 @@
  */
 @interface __ObjC_Protocol_Holder_Ugly_Hack { id isa; } @end
 @implementation __ObjC_Protocol_Holder_Ugly_Hack @end
-#endif
 
 @implementation Object @end

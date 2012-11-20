@@ -5,6 +5,7 @@
 
 #include "objc/runtime.h"
 #include "method_list.h"
+#include "visibility.h"
 
 size_t objc_alignof_type (const char *type);
 
@@ -38,14 +39,15 @@ const char *objc_skip_argspec(const char *type)
 	return type;
 }
 
-static size_t lengthOfTypeEncoding(const char *types)
+PRIVATE size_t lengthOfTypeEncoding(const char *types)
 {
+	if ((NULL == types) || ('\0' == types[0])) { return 0; }
 	const char *end = objc_skip_typespec(types);
 	size_t length = end - types;
 	return length;
 }
 
-static char *copyTypeEncoding(const char *types)
+static char* copyTypeEncoding(const char *types)
 {
 	size_t length = lengthOfTypeEncoding(types);
 	char *copy = malloc(length + 1);
@@ -95,6 +97,22 @@ static void parse_struct_or_union(const char **type, type_parser callback, void 
 
 	while (**type != endchar)
 	{
+		// Structure elements sometimes have their names in front of each
+		// element, as in {NSPoint="x"f"y"f} - We need to skip the type name
+		// here.
+		//
+		// TODO: In a future version we should provide a callback that lets
+		// users of this code get the field name
+		if ('"'== **type)
+		{
+
+			do
+			{
+				(*type)++;
+			} while ('"' != **type);
+			// Skip the closing "
+			(*type)++;
+		}
 		*type = callback(*type, context);
 	}
 	// skip }
@@ -113,7 +131,7 @@ static void parse_struct(const char **type, type_parser callback, void *context)
 
 inline static void round_up(size_t *v, size_t b)
 {
-        if (0 == b)
+	if (0 == b)
 	{
 		return;
 	}
@@ -123,12 +141,6 @@ inline static void round_up(size_t *v, size_t b)
 		*v += b - (*v % b);
 	}
 }
-
-// On Windows, we pick up a #define of max here.
-#ifdef max
-#  undef max
-#endif
-
 inline static size_t max(size_t v, size_t v2)
 {
 	return v>v2 ? v : v2;
@@ -150,8 +162,19 @@ static const char *sizeof_type(const char *type, size_t *size)
 			*size += (sizeof(typeName) * 8);\
 			return type + 1;\
 		}
+#define SKIP_ID 1
 #define NON_INTEGER_TYPES 1
 #include "type_encoding_cases.h"
+		case '@':
+		{
+			round_up(size, (alignof(id) * 8));
+			*size += (sizeof(id) * 8);
+			if (*(type+1) == '?')
+			{
+				type++;
+			}
+			return type + 1;
+		}
 		case '?':
 		case 'v': return type+1;
 		case 'j':
@@ -180,7 +203,7 @@ static const char *sizeof_type(const char *type, size_t *size)
 		case '[':
 		{
 			const char *t = type;
-			int element_size = 0;
+			size_t element_size = 0;
 			// FIXME: aligned size
 			int element_count = parse_array(&t, (type_parser)sizeof_type, &element_size);
 			(*size) += element_size * element_count;
@@ -241,7 +264,17 @@ static const char *alignof_type(const char *type, size_t *align)
 			return type + 1;\
 		}
 #define NON_INTEGER_TYPES 1
+#define SKIP_ID 1
 #include "type_encoding_cases.h"
+		case '@':
+		{
+			*align = max((alignof(id) * 8), *align);\
+			if (*(type+1) == '?')
+			{
+				type++;
+			}
+			return type + 1;
+		}
 		case '?':
 		case 'v': return type+1;
 		case 'j':
@@ -273,7 +306,6 @@ static const char *alignof_type(const char *type, size_t *align)
 		case '[':
 		{
 			const char *t = type;
-			// FIXME: aligned size
 			parse_array(&t, (type_parser)alignof_type, &align);
 			return t;
 		}
@@ -397,7 +429,7 @@ unsigned method_get_number_of_arguments(struct objc_method *method)
 }
 
 
-char * method_copyArgumentType(Method method, unsigned int index)
+char* method_copyArgumentType(Method method, unsigned int index)
 {
 	if (NULL == method) { return NULL; }
 	const char *types = findParameterStart(method->types, index);
@@ -408,7 +440,7 @@ char * method_copyArgumentType(Method method, unsigned int index)
 	return copyTypeEncoding(types);
 }
 
-char * method_copyReturnType(Method method)
+char* method_copyReturnType(Method method)
 {
 	if (NULL == method) { return NULL; }
 	return copyTypeEncoding(method->types);
@@ -495,9 +527,10 @@ void objc_layout_structure_get_info (struct objc_struct_layout *layout,
 {
 	//printf("%p\n", layout);
 	*type = layout->type;
-	*offset = layout->record_size / 8;
+	size_t off = layout->record_size / 8;
 	*align= layout->record_align / 8;
-	round_up((size_t*)offset, (size_t)*align);
+	round_up(&off, (size_t)*align);
+	*offset = (unsigned int)off;
 }
 
 #ifdef ENCODING_TESTS

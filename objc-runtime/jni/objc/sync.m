@@ -1,7 +1,9 @@
 /*
- * Copyright (c) 1999-2007 Apple Inc.  All Rights Reserved.
- * 
+ * Copyright (c) 1999 Apple Computer, Inc. All rights reserved.
+ *
  * @APPLE_LICENSE_HEADER_START@
+ * 
+ * Copyright (c) 1999-2003 Apple Computer, Inc.  All Rights Reserved.
  * 
  * This file contains Original Code and/or Modifications of Original Code
  * as defined in and that are subject to the Apple Public Source License
@@ -21,6 +23,8 @@
  * @APPLE_LICENSE_HEADER_END@
  */
 
+// revised comments by Blaine
+// revised for android by Philippe Hausler, Apportable Inc 
 #import <pthread.h>
 #import <objc/runtime.h>
 #import <strings.h>
@@ -51,6 +55,8 @@ typedef struct {
 // in time, keep them on a single list.
 //
 
+static pthread_mutexattr_t	sRecursiveLockAttr;
+static bool			sRecursiveLockAttrIntialized = false;
 
 typedef struct SyncData {
     struct SyncData* nextData;

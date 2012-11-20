@@ -5,12 +5,11 @@
 
 #include <stdlib.h>
 
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 128
 static BUFFER_TYPE *buffered_object_buffer[BUFFER_SIZE];
-static BUFFER_TYPE **buffered_object_overflow = NULL;
-// For mysterious reasons initializing buffered_objects explicitly fixes a crash on Mac
-static int buffered_objects = 0;
-static int buffered_object_overflow_space = 0;
+static BUFFER_TYPE **buffered_object_overflow;
+static int buffered_objects;
+static int buffered_object_overflow_space;
 
 static void set_buffered_object_at_index(BUFFER_TYPE *cat, unsigned int i)
 {
@@ -27,7 +26,7 @@ static void set_buffered_object_at_index(BUFFER_TYPE *cat, unsigned int i)
 				calloc(BUFFER_SIZE, sizeof(BUFFER_TYPE*));
 			buffered_object_overflow_space = BUFFER_SIZE;
 		}
-		while (i > buffered_object_overflow_space)
+		while (i >= buffered_object_overflow_space)
 		{
 			buffered_object_overflow_space <<= 1;
 			buffered_object_overflow = realloc(buffered_object_overflow,

@@ -1,3 +1,4 @@
+#include "visibility.h"
 
 enum PropertyAttributeKind 
 {
@@ -42,7 +43,8 @@ enum PropertyAttributeKind
 /**
  * Structure used for property enumeration.  Note that property enumeration is
  * currently quite broken on OS X, so achieving full compatibility there is
- * impossible.  Instead, we strive to achieve com
+ * impossible.  Instead, we strive to achieve compatibility with the
+ * documentation.
  */
 struct objc_property
 {
@@ -54,27 +56,7 @@ struct objc_property
 	 * Attributes for this property.  Made by ORing together
 	 * PropertyAttributeKinds.
 	 */
-	const char attributes;
-	/**
-	 * Flag set if the property is synthesized.
-	 */
-	const char isSynthesized;
-	/**
-	 * Name of the getter for this property.
-	 */
-	const char *getter_name;
-	/**
-	 * Type encoding for the get method for this property.
-	 */
-	const char *getter_types;
-	/**
-	 * Name of the set method for this property.
-	 */
-	const char *setter_name;
-	/**
-	 * Type encoding of the setter for this property.
-	 */
-	const char *setter_types;
+	const char *attributes;
 };
 
 /**
@@ -82,18 +64,22 @@ struct objc_property
  */
 struct objc_property_list
 {
+	/* 
+	 * The next property in a linked list.
+	 */
+	struct objc_property_list *next; 
 	/**
 	 * Number of properties in this array.
 	 */
 	int count;
-	/* 
-	 * UNUSED.  In future, categories will be allowed to add properties and
-	 * then this will be used to link the declarations together.
-	 */
-	struct objc_property_list *next; 
 	/**
 	 * List of properties.
 	 */
-	struct objc_property properties[1];
+	struct objc_property properties[];
 };
 
+/**
+ * Constructs a property description from a list of attributes.
+ */
+PRIVATE struct objc_property propertyFromAttrs(const objc_property_attribute_t *attributes,
+                                               unsigned int attributeCount);

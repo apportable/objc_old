@@ -9,10 +9,13 @@
 #include "llvm/Support/IRBuilder.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/InlineCost.h"
+#include "llvm/DefaultPasses.h"
+#include "ObjectiveCOpts.h"
 #include "IMPCacher.h"
 #include <string>
 
 using namespace llvm;
+using namespace GNUstep;
 using std::string;
 
 // Mangle a method name
@@ -36,7 +39,7 @@ namespace
 
     public:
     static char ID;
-    ClassMethodInliner() : ModulePass((intptr_t)&ID) {}
+    ClassMethodInliner() : ModulePass(ID) {}
 
     virtual bool runOnModule(Module &M) {
       unsigned MessageSendMDKind = M.getContext().getMDKindID("GNUObjCMessageSend");
@@ -44,8 +47,8 @@ namespace
       SmallPtrSet<const Function *, 16> NeverInline;
 
       GNUstep::IMPCacher cacher = GNUstep::IMPCacher(M.getContext(), this);
-      // FIXME: ILP64
-      IntTy = Type::getInt32Ty(M.getContext());
+      IntTy = (sizeof(int) == 4 ) ? Type::getInt32Ty(M.getContext()) :
+          Type::getInt64Ty(M.getContext()) ;
       bool modified = false;
 
       for (Module::iterator F=M.begin(), fend=M.end() ;
@@ -59,7 +62,7 @@ namespace
             i != end ; ++i) {
           for (BasicBlock::iterator b=i->begin(), last=i->end() ;
               b != last ; ++b) {
-            CallSite call = CallSite::get(b);
+            CallSite call(b);
             if (call.getInstruction() && !call.getCalledFunction()) {
               MDNode *messageType = call->getMetadata(MessageSendMDKind);
               if (0 == messageType) { continue; }
@@ -77,14 +80,19 @@ namespace
                 cast<MDString>(messageType->getOperand(1))->getString();
           bool isClassMethod = 
                 cast<ConstantInt>(messageType->getOperand(2))->isOne();
-          StringRef functionName = SymbolNameForMethod(cls, "", sel, isClassMethod);
+          std::string functionName = SymbolNameForMethod(cls, "", sel, isClassMethod);
           Function *method = M.getFunction(functionName);
 
           if (0 == method || method->isDeclaration()) { continue; }
 
+#if (LLVM_MAJOR > 3) || ((LLVM_MAJOR == 3) && (LLVM_MINOR > 0))
+          InlineCost IC = CA.getInlineCost((*i), method, 200);
+#else
           InlineCost IC = CA.getInlineCost((*i), method, NeverInline);
+#define getCost getValue
+#endif
           // FIXME: 200 is a random number.  Pick a better one!
-          if (IC.isAlways() || (IC.isVariable() && IC.getValue() < 200)) {
+          if (IC.isAlways() || (IC.isVariable() && IC.getCost() < 200)) {
             cacher.SpeculativelyInline((*i).getInstruction(), method);
             i->getInstruction()->setMetadata(MessageSendMDKind, 0);
             modified = true;

@@ -2,7 +2,9 @@
 #include "class.h"
 #include "sarray2.h"
 #include "objc/slot.h"
+#include "visibility.h"
 #include <stdint.h>
+#include <stdio.h>
 
 #ifdef __OBJC_LOW_MEMORY__
 typedef struct objc_dtable* dtable_t;
@@ -15,7 +17,7 @@ typedef SparseArray* dtable_t;
 /**
  * Pointer to the sparse array representing the pretend (uninstalled) dtable.
  */
-extern dtable_t __objc_uninstalled_dtable;
+PRIVATE extern dtable_t uninstalled_dtable;
 /**
  * Structure for maintaining a linked list of temporary dtables.  When sending
  * an +initialize message to a class, we create a temporary dtables and store
@@ -41,9 +43,11 @@ extern mutex_t initialize_lock;
  */
 static inline int classHasInstalledDtable(struct objc_class *cls)
 {
-	return (cls->dtable != __objc_uninstalled_dtable);
+	return (cls->dtable != uninstalled_dtable);
 }
 
+int objc_sync_enter(id object);
+int objc_sync_exit(id object);
 /**
  * Returns the dtable for a given class.  If we are currently in an +initialize
  * method then this will block if called from a thread other than the one
@@ -55,29 +59,44 @@ static inline dtable_t dtable_for_class(Class cls)
 	{
 		return cls->dtable;
 	}
-	LOCK_UNTIL_RETURN(&initialize_lock);
-	if (classHasInstalledDtable(cls))
+
+	dtable_t dtable = uninstalled_dtable;
+
 	{
-		return cls->dtable;
-	}
-	/* This is a linear search, and so, in theory, could be very slow.  It is
-	* O(n) where n is the number of +initialize methods on the stack.  In
-	* practice, this is a very small number.  Profiling with GNUstep showed that
-	* this peaks at 8. */
-	dtable_t dtable = __objc_uninstalled_dtable;
-	InitializingDtable *buffer = temporary_dtables;
-	while (NULL != buffer)
-	{
-		if (buffer->class == cls)
+		LOCK_FOR_SCOPE(&initialize_lock);
+		if (classHasInstalledDtable(cls))
 		{
-			dtable = buffer->dtable;
-			break;
+			return cls->dtable;
 		}
-		buffer = buffer->next;
+		/* This is a linear search, and so, in theory, could be very slow.  It
+		 * is O(n) where n is the number of +initialize methods on the stack.
+		 * In practice, this is a very small number.  Profiling with GNUstep
+		 * showed that this peaks at 8. */
+		InitializingDtable *buffer = temporary_dtables;
+		while (NULL != buffer)
+		{
+			if (buffer->class == cls)
+			{
+				dtable = buffer->dtable;
+				break;
+			}
+			buffer = buffer->next;
+		}
 	}
-	if (dtable == 0)
+
+	if (dtable != uninstalled_dtable)
 	{
-		dtable = __objc_uninstalled_dtable;
+		// Make sure that we block if +initialize is still running.  We do this
+		// after we've released the initialize lock, so that the real dtable
+		// can be installed.  This acquires / releases a recursive mutex, so if
+		// this mutex is already held by this thread then this will proceed
+		// immediately.  If it's held by another thread (i.e. the one running
+		// +initialize) then we block here until it's run.  We don't need to do
+		// this if the dtable is the uninstalled dtable, because that means
+		// +initialize has not yet been sent, so we can wait until something
+		// triggers it before needing any synchronisation.
+		objc_sync_enter((id)cls);
+		objc_sync_exit((id)cls);
 	}
 	return dtable;
 }
@@ -88,7 +107,7 @@ static inline dtable_t dtable_for_class(Class cls)
  */
 static inline int classHasDtable(struct objc_class *cls)
 {
-	return (dtable_for_class(cls) != __objc_uninstalled_dtable);
+	return (dtable_for_class(cls) != uninstalled_dtable);
 }
 
 /**
@@ -96,8 +115,14 @@ static inline int classHasDtable(struct objc_class *cls)
  * modifying a class's method list.
  */
 void objc_update_dtable_for_class(Class);
+/**
+ * Adds a single method list to a class.  This is used when loading categories,
+ * and is faster than completely rebuilding the dtable.
+ */
+void add_method_list_to_class(Class cls,
+                              struct objc_method_list *list);
 
 /**
- * Creates a copy of the class's dispatch table.
+ * Destroys a dtable.
  */
-dtable_t objc_copy_dtable_for_class(dtable_t old, Class cls);
+void free_dtable(dtable_t dtable);

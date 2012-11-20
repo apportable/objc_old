@@ -9,6 +9,7 @@
 #include <vector>
 
 using namespace llvm;
+#include "LLVMCompat.h"
 
 namespace {
   struct GNUObjCTypeFeedback : public ModulePass {
@@ -17,8 +18,8 @@ namespace {
     typedef std::vector<callPair > replacementVector;
       static char ID;
     uint32_t callsiteCount;
-    const IntegerType *Int32Ty;
-      GNUObjCTypeFeedback() : ModulePass(&ID), callsiteCount(0) {}
+    LLVMIntegerType *Int32Ty;
+      GNUObjCTypeFeedback() : ModulePass(ID), callsiteCount(0) {}
 
     void profileFunction(Function &F, Constant *ModuleID) {
       for (Function::iterator i=F.begin(), e=F.end() ;
@@ -29,16 +30,19 @@ namespace {
         for (BasicBlock::iterator b=i->begin(), last=i->end() ;
             b != last ; ++b) {
 
-          CallSite call = CallSite::get(b);
+          CallSite call(b);
           if (call.getInstruction() && !call.getCalledFunction()) {
-            llvm::Value *args[] = { call->getOperand(1), call->getOperand(0),
-              ModuleID, ConstantInt::get(Int32Ty, callsiteCount++) };
+            llvm::SmallVector<llvm::Value*, 4> args;
+            args.push_back(call->getOperand(1));
+            args.push_back(call->getOperand(0)),
+            args.push_back(ModuleID);
+            args.push_back(ConstantInt::get(Int32Ty, callsiteCount++));
             Constant *profile = 
                 M->getOrInsertFunction("objc_msg_profile",
                   Type::getVoidTy(M->getContext()),
                   args[0]->getType(), args[1]->getType(),
                   args[2]->getType(), args[3]->getType(), NULL);
-            CallInst::Create(profile, args, args+4, "", call.getInstruction());
+            CreateCall(profile, args, "", call.getInstruction());
           }
         }
       }
@@ -49,9 +53,13 @@ namespace {
     {
       LLVMContext &VMContext = M.getContext();
       Int32Ty = IntegerType::get(VMContext, 32);
-      const PointerType *PtrTy = Type::getInt8PtrTy(VMContext);
+      LLVMPointerType *PtrTy = Type::getInt8PtrTy(VMContext);
       Constant *moduleName = 
+#if (LLVM_MAJOR > 3) || ((LLVM_MAJOR == 3) && (LLVM_MINOR > 0))
+        ConstantDataArray::getString(VMContext, M.getModuleIdentifier(), true);
+#else
         ConstantArray::get(VMContext, M.getModuleIdentifier(), true);
+#endif
       moduleName = new GlobalVariable(M, moduleName->getType(), true,
           GlobalValue::InternalLinkage, moduleName,
           ".objc_profile_module_name");
@@ -71,7 +79,11 @@ namespace {
         functions.push_back(ConstantExpr::getBitCast(F, PtrTy));
 
         Constant * ConstStr = 
+#if (LLVM_MAJOR > 3) || ((LLVM_MAJOR == 3) && (LLVM_MINOR > 0))
+          llvm::ConstantDataArray::getString(VMContext, F->getName(), true);
+#else
           llvm::ConstantArray::get(VMContext, F->getName());
+#endif
         ConstStr = new GlobalVariable(M, ConstStr->getType(), true,
             GlobalValue::PrivateLinkage, ConstStr, "str");
         functions.push_back(
@@ -107,13 +119,13 @@ namespace {
       }
 
       // Type of one ctor
-      const Type *ctorTy =
+      LLVMType *ctorTy =
         cast<ArrayType>(GCL->getType()->getElementType())->getElementType();
       // Add the 
       std::vector<Constant*> CSVals;
       CSVals.push_back(ConstantInt::get(Type::getInt32Ty(VMContext),65535));
       CSVals.push_back(init);
-      ctors.push_back(ConstantStruct::get(GCL->getContext(), CSVals, false));
+      ctors.push_back(GetConstantStruct(GCL->getContext(), CSVals, false));
       // Create the array initializer.
       CA = cast<ConstantArray>(ConstantArray::get(ArrayType::get(ctorTy,
             ctors.size()), ctors));

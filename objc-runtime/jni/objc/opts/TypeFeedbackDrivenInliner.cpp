@@ -25,7 +25,7 @@ namespace {
 
     public:
 
-    GNUObjCTypeFeedbackDrivenInliner() : ModulePass(&ID), callsiteCount(0) {}
+    GNUObjCTypeFeedbackDrivenInliner() : ModulePass(ID), callsiteCount(0) {}
 
     virtual bool runOnModule(Module &M)
     {
@@ -51,7 +51,7 @@ namespace {
             i != end ; ++i) {
           for (BasicBlock::iterator b=i->begin(), last=i->end() ;
               b != last ; ++b) {
-            CallSite call = CallSite::get(b);
+            CallSite call(b);
             if (call.getInstruction() && !call.getCalledFunction()) {
               messages.push_back(call);
             }
@@ -65,13 +65,17 @@ namespace {
 
         if (Entry->size() == 1) {
 
-          TypeInfoProvider::CallSiteEntry::iterator iterator = Entry->begin();
           Function *method = M.getFunction(Entry->begin()->getKey());
           if (0 == method || method->isDeclaration()) { continue; }
 
+#if (LLVM_MAJOR > 3) || ((LLVM_MAJOR == 3) && (LLVM_MINOR > 0))
+          InlineCost IC = CA.getInlineCost((*i), method, 200);
+#else
           InlineCost IC = CA.getInlineCost((*i), method, NeverInline);
+#define getCost getValue
+#endif
           // FIXME: 200 is a random number.  Pick a better one!
-          if (IC.isAlways() || (IC.isVariable() && IC.getValue() < 200)) {
+          if (IC.isAlways() || (IC.isVariable() && IC.getCost() < 200)) {
             cacher.SpeculativelyInline((*i).getInstruction(), method);
             modified = true;
           }
