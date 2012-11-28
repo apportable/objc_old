@@ -9,6 +9,7 @@
 #include "ivar.h"
 #include "dtable.h"
 #include "visibility.h"
+#include "properties.h"
 #include <stdlib.h>
 #include <assert.h>
 
@@ -418,6 +419,34 @@ PRIVATE void objc_load_class(struct objc_class *class)
 	{
 		objc_init_protocols(class->protocols);
 	}
+
+#if 0
+	// Use this to debug the loaded properties/methods
+	struct objc_property_list *properties = class->properties;
+	if (properties != NULL)
+	{
+		do {
+			for (int i = 0; i < properties->count; i++){
+				objc_property_t prop = &properties->properties[i];
+				DEBUG_LOG("prop %s %s %s", class->name, prop->name, prop->attributes);
+			}
+			properties = properties->next;
+		} while (properties != NULL);
+	}
+	
+
+	struct objc_method_list *methods = class->methods;
+	if (methods != NULL)
+	{
+		do {
+			for (int i = 0; i < methods->count; i++){
+				Method method = &methods->methods[i];
+				DEBUG_LOG("method %s %s", class->name, sel_getName(method->selector));
+			}
+			methods = methods->next;
+		} while (methods != NULL);
+	}
+#endif
 }
 
 PRIVATE Class SmallObjectClasses[7];
