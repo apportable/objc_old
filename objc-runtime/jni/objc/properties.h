@@ -64,14 +64,14 @@ struct objc_property
  */
 struct objc_property_list
 {
-	/* 
-	 * The next property in a linked list.
-	 */
-	struct objc_property_list *next; 
 	/**
 	 * Number of properties in this array.
 	 */
 	int count;
+	/* 
+	 * The next property in a linked list.
+	 */
+	struct objc_property_list *next; 
 	/**
 	 * List of properties.
 	 */
