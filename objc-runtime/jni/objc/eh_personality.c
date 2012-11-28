@@ -132,14 +132,11 @@ void objc_exception_throw(id object)
 	if ((nil != object) &&
 	    (class_respondsToSelector(classForObject(object), rethrow_sel)))
 	{
-		fprintf(stderr, "Rethrowing\n");
 		IMP rethrow = objc_msg_lookup(object, rethrow_sel);
 		rethrow(object, rethrow_sel);
 		// Should not be reached!  If it is, then the rethrow method actually
 		// didn't, so we throw it normally.
 	}
-
-	fprintf(stderr, "Throwing %p\n", object);
 
 	struct objc_exception *ex = calloc(1, sizeof(struct objc_exception));
 
@@ -154,8 +151,6 @@ void objc_exception_throw(id object)
 	{
 		_objc_unexpected_exception(object);
 	}
-	fprintf(stderr, "Throw returned %d\n",(int) err);
-	//abort();
 }
 
 static Class get_type_table_entry(struct _Unwind_Context *context,
@@ -425,7 +420,6 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 }
 
 // FIXME!
-#ifndef __arm__
 BEGIN_PERSONALITY_FUNCTION(__gnustep_objcxx_personality_v0)
 	if (exceptionClass == objc_exception_class)
 	{
@@ -439,12 +433,14 @@ BEGIN_PERSONALITY_FUNCTION(__gnustep_objcxx_personality_v0)
 			ex->cxx_exception = objc_init_cxx_exception(newEx);
 			ex->cxx_exception->exception_class = cxx_exception_class;
 			ex->cxx_exception->exception_cleanup = cleanup;
-			ex->cxx_exception->private_1 = exceptionObject->private_1;
-			ex->cxx_exception->private_2 = exceptionObject->private_2;
+			ex->cxx_exception->unwinder_cache.reserved1 = exceptionObject->unwinder_cache.reserved1;
+			ex->cxx_exception->unwinder_cache.reserved2 = exceptionObject->unwinder_cache.reserved2;
+			ex->cxx_exception->unwinder_cache.reserved3 = exceptionObject->unwinder_cache.reserved3;
+			ex->cxx_exception->unwinder_cache.reserved4 = exceptionObject->unwinder_cache.reserved4;
+			ex->cxx_exception->unwinder_cache.reserved5 = exceptionObject->unwinder_cache.reserved5;
 		}
 		exceptionObject = ex->cxx_exception;
 		exceptionClass = cxx_exception_class;
 	}
 	return CALL_PERSONALITY_FUNCTION(__gxx_personality_v0);
 }
-#endif
