@@ -7,8 +7,6 @@
 #include "class.h"
 #include "objcxx_eh.h"
 
-#define fprintf(...)
-
 /**
  * Class of exceptions to distinguish between this and other exception types.
  */
@@ -170,7 +168,7 @@ static Class get_type_table_entry(struct _Unwind_Context *context,
 
 	if (0 == class_name) { return Nil; }
 
-	fprintf(stderr, "Class name: %s\n", class_name);
+	DEBUG_LOG("Class name: %s", class_name);
 
 	if (strcmp("@id", class_name) == 0) { return (Class)1; }
 
@@ -206,11 +204,11 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 		dw_eh_ptr_t action_record_offset_base = action_record;
 		int displacement = read_sleb128(&action_record);
 		*selector = filter;
-		fprintf(stderr, "Filter: %d\n", filter);
+		DEBUG_LOG("Filter: %d\n", filter);
 		if (filter > 0)
 		{
 			Class type = get_type_table_entry(context, lsda, filter);
-			fprintf(stderr, "%p type: %d\n", type, !foreignException);
+			DEBUG_LOG("%p type: %d\n", type, !foreignException);
 			// Catchall
 			if (Nil == type)
 			{
@@ -220,7 +218,7 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 			// nothing when a foreign exception is thrown
 			else if ((Class)1 == type)
 			{
-				fprintf(stderr, "Found id catch\n");
+				DEBUG_LOG("Found id catch\n");
 				if (!foreignException)
 				{
 					return handler_catchall_id;
@@ -228,7 +226,7 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 			}
 			else if (!foreignException && isKindOfClass(thrown_class, type))
 			{
-				fprintf(stderr, "found handler for %s\n", type->name);
+				DEBUG_LOG("found handler for %s\n", type->name);
 				return handler_class;
 			}
 			else if (thrown_class == type)
@@ -238,14 +236,14 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 		}
 		else if (filter == 0)
 		{
-			fprintf(stderr, "0 filter\n");
+			DEBUG_LOG("0 filter\n");
 			// Cleanup?  I think the GNU ABI doesn't actually use this, but it
 			// would be a good way of indicating a non-id catchall...
 			return handler_cleanup;
 		}
 		else
 		{
-			fprintf(stderr, "Filter value: %d\n"
+			DEBUG_LOG("Filter value: %d\n"
 					"Your compiler and I disagree on the correct layout of EH data.\n", 
 					filter);
 			abort();
@@ -261,7 +259,7 @@ static handler_type check_action_record(struct _Unwind_Context *context,
  * The Objective-C exception personality function.  
  */
 BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
-	fprintf(stderr, "Personality function called\n");
+	DEBUG_LOG("Personality function called\n");
 	
 	// This personality function is for version 1 of the ABI.  If you use it
 	// with a future version of the ABI, it won't know what to do, so it
@@ -271,10 +269,8 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 		return _URC_FATAL_PHASE1_ERROR;
 	}
 	struct objc_exception *ex = 0;
-#ifndef fprintf
 	char *cls = (char*)&exceptionClass;
-#endif
-	fprintf(stderr, "Class: %c%c%c%c%c%c%c%c\n", cls[7], cls[6], cls[5], cls[4], cls[3], cls[2], cls[1], cls[0]);
+	DEBUG_LOG("Class: %c%c%c%c%c%c%c%c", cls[7], cls[6], cls[5], cls[4], cls[3], cls[2], cls[1], cls[0]);
 
 	// Check if this is a foreign exception.  If it is a C++ exception, then we
 	// have to box it.  If it's something else, like a LanguageKit exception
@@ -292,7 +288,7 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 		if (obj != (id)-1)
 		{
 			object = obj;
-			fprintf(stderr, "ObjC++ object exception %p\n", object);
+			DEBUG_LOG("ObjC++ object exception %p", object);
 			objcxxException = YES;
 			// This is a foreign exception, buy for the purposes of exception
 			// matching, we pretend that it isn't.
@@ -319,10 +315,10 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 	else if (_objc_class_for_boxing_foreign_exception)
 	{
 		thrown_class = _objc_class_for_boxing_foreign_exception(exceptionClass);
-		fprintf(stderr, "Foreign class: %p\n", thrown_class);
+		DEBUG_LOG("Foreign class: %p", thrown_class);
 	}
 	unsigned char *lsda_addr = (void*)_Unwind_GetLanguageSpecificData(context);
-	fprintf(stderr, "LSDA: %p\n", lsda_addr);
+	DEBUG_LOG("LSDA: %p", lsda_addr);
 
 	// No LSDA implies no landing pads - try the next frame
 	if (0 == lsda_addr) { return _URC_CONTINUE_UNWIND; }
@@ -333,12 +329,12 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 	
 	if (actions & _UA_SEARCH_PHASE)
 	{
-		fprintf(stderr, "Search phase...\n");
+		DEBUG_LOG("Search phase...");
 		struct dwarf_eh_lsda lsda = parse_lsda(context, lsda_addr);
 		action = dwarf_eh_find_callsite(context, &lsda);
 		handler_type handler = check_action_record(context, foreignException,
 				&lsda, action.action_record, thrown_class, &selector);
-		fprintf(stderr, "handler: %d\n", handler);
+		DEBUG_LOG("handler: %d", handler);
 		// If there's no action record, we've only found a cleanup, so keep
 		// searching for something real
 		if (handler == handler_class ||
@@ -346,12 +342,12 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 			(handler == handler_catchall))
 		{
 			saveLandingPad(context, exceptionObject, ex, selector, action.landing_pad);
-			fprintf(stderr, "Found handler! %d\n", handler);
+			DEBUG_LOG("Found handler! %d", handler);
 			return _URC_HANDLER_FOUND;
 		}
 		return _URC_CONTINUE_UNWIND;
 	}
-	fprintf(stderr, "Phase 2: Fight!\n");
+	DEBUG_LOG("Phase 2: Fight!");
 
 	// TODO: If this is a C++ exception, we can cache the lookup and cheat a
 	// bit
@@ -366,16 +362,16 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 		}
 		handler_type handler = check_action_record(context, foreignException,
 				&lsda, action.action_record, thrown_class, &selector);
-		fprintf(stderr, "handler! %d %d\n", (int)handler,  (int)selector);
+		DEBUG_LOG("handler! %d %d", (int)handler,  (int)selector);
 		// If this is not a cleanup, ignore it and keep unwinding.
 		//if (check_action_record(context, foreignException, &lsda,
 				//action.action_record, thrown_class, &selector) != handler_cleanup)
 		if (handler != handler_cleanup)
 		{
-			fprintf(stderr, "Ignoring handler! %d\n",handler);
+			DEBUG_LOG("Ignoring handler! %d",handler);
 			return _URC_CONTINUE_UNWIND;
 		}
-		fprintf(stderr, "Installing cleanup...\n");
+		DEBUG_LOG("Installing cleanup...");
 		// If there is a cleanup, we need to return the exception structure
 		// (not the object) to the calling frame.  The exception object
 		object = exceptionObject;
@@ -391,12 +387,12 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 		// exception, then we need to delete the exception object.
 		if (foreignException)
 		{
-			fprintf(stderr, "Doing the foreign exception thing...\n");
+			DEBUG_LOG("Doing the foreign exception thing...");
 			//[thrown_class exceptionWithForeignException: exceptionObject];
 			SEL box_sel = sel_registerName("exceptionWithForeignException:");
 			IMP boxfunction = objc_msg_lookup((id)thrown_class, box_sel);
 			object = boxfunction((id)thrown_class, box_sel, exceptionObject);
-			fprintf(stderr, "Boxed as %p\n", object);
+			DEBUG_LOG("Boxed as %p", object);
 		}
 		else // ObjCXX exception
 		{
