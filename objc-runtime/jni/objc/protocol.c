@@ -5,7 +5,7 @@
 #include "lock.h"
 #include <stdlib.h>
 
-extern const char *copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
+extern const char *_objc_copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
 
 #define BUFFER_TYPE struct objc_protocol_list
 #include "buffer.h"
@@ -600,7 +600,7 @@ void protocol_addProperty(Protocol *aProtocol,
 		{
 			free((char *)old->attributes);
 		}
-		old->attributes = copyPropertyAttributeString(attributes, attributeCount);
+		old->attributes = _objc_copyPropertyAttributeString(attributes, attributeCount);
 	}
 	else { //new
 		LOCK_RUNTIME_FOR_SCOPE();
@@ -608,7 +608,7 @@ void protocol_addProperty(Protocol *aProtocol,
 			+ sizeof(struct objc_property));
 		l->count = 1;
 		l->properties[0].name = strdup(name);
-		l->properties[0].attributes = copyPropertyAttributeString(attributes, attributeCount);
+		l->properties[0].attributes = _objc_copyPropertyAttributeString(attributes, attributeCount);
 		if (isRequiredProperty)
 		{
 			l->next = proto->properties;

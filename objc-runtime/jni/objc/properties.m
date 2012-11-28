@@ -12,9 +12,9 @@
 #include "gc_ops.h"
 #include "lock.h"
 
-extern const char *copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
-extern objc_property_attribute_t *copyPropertyAttributeList(const char *attrs, unsigned int *outCount);
-extern char *copyPropertyAttributeValue(const char *attrs, const char *name);
+extern const char *_objc_copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
+extern objc_property_attribute_t *_objc_copyPropertyAttributeList(const char *attrs, unsigned int *outCount);
+extern char *_objc_copyPropertyAttributeValue(const char *attrs, const char *name);
 
 PRIVATE int spinlocks[spinlock_count];
 
@@ -256,7 +256,7 @@ objc_property_attribute_t *property_copyAttributeList(objc_property_t property,
 
 	LOCK_RUNTIME_FOR_SCOPE();
 	objc_property_attribute_t *result;
-	result = copyPropertyAttributeList(property->attributes, outCount);
+	result = _objc_copyPropertyAttributeList(property->attributes, outCount);
 	return result;
 }
 
@@ -281,7 +281,7 @@ BOOL _class_addProperty(Class cls,
 		{
 			free((char *)old->attributes);
 		}
-		old->attributes = copyPropertyAttributeString(attributes, attributeCount);
+		old->attributes = _objc_copyPropertyAttributeString(attributes, attributeCount);
 		return YES;
 	}
 	else { //new
@@ -290,7 +290,7 @@ BOOL _class_addProperty(Class cls,
 			+ sizeof(struct objc_property));
 		l->count = 1;
 		l->properties[0].name = strdup(name);
-		l->properties[0].attributes = copyPropertyAttributeString(attributes, attributeCount);
+		l->properties[0].attributes = _objc_copyPropertyAttributeString(attributes, attributeCount);
 		l->next = cls->properties;
 		cls->properties = l;
 		return YES;
@@ -322,6 +322,6 @@ char *property_copyAttributeValue(objc_property_t property,
 		return NULL;
 
 	LOCK_RUNTIME_FOR_SCOPE();
-	char *result = copyPropertyAttributeValue(property->attributes, attributeName);
+	char *result = _objc_copyPropertyAttributeValue(property->attributes, attributeName);
 	return result;
 }

@@ -25,13 +25,14 @@
 #include <string.h>
 #include <assert.h>
 
-extern const char *copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
-extern objc_property_attribute_t *copyPropertyAttributeList(const char *attrs, unsigned int *outCount);
-extern char *copyPropertyAttributeValue(const char *attrs, const char *name);
+extern const char *_objc_copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
+extern objc_property_attribute_t *_objc_copyPropertyAttributeList(const char *attrs, unsigned int *outCount);
+extern char *_objc_copyPropertyAttributeValue(const char *attrs, const char *name);
+extern char *_objc_copyPropertyAttributeValueStarting(const char *attrs, const char *name);
 
 
 const char *
-copyPropertyAttributeString(const objc_property_attribute_t *attrs,
+_objc_copyPropertyAttributeString(const objc_property_attribute_t *attrs,
                             unsigned int count)
 {
     char *result;
@@ -198,7 +199,7 @@ copyOneAttribute(unsigned int index, void *ctxa, void *ctxs,
 
                  
 objc_property_attribute_t *
-copyPropertyAttributeList(const char *attrs, unsigned int *outCount)
+_objc_copyPropertyAttributeList(const char *attrs, unsigned int *outCount)
 {
     if (!attrs) {
         if (outCount) *outCount = 0;
@@ -260,11 +261,38 @@ findOneAttribute(unsigned int index, void *ctxa, void *ctxs,
     return YES;
 }
 
-char *copyPropertyAttributeValue(const char *attrs, const char *name)
+static BOOL
+findOneStartAttribute(unsigned int index, void *ctxa, void *ctxs, 
+                 const char *name, size_t nlen, const char *value, size_t vlen)
+{
+    const char *query = (char *)ctxa;
+    char **resultp = (char **)ctxs;
+
+    if (0 == strncmp(name, query, nlen)) {
+        char *result = (char *)calloc(vlen+1, 1);
+        memcpy(result, value, vlen);
+        result[vlen] = '\0';
+        *resultp = result;
+        return NO;
+    }
+
+    return YES;
+}
+
+char *_objc_copyPropertyAttributeValue(const char *attrs, const char *name)
 {
     char *result = NULL;
 
     iteratePropertyAttributes(attrs, findOneAttribute, (void*)name, &result);
+
+    return result;
+}
+
+char *_objc_copyPropertyAttributeValueStarting(const char *attrs, const char *name)
+{
+    char *result = NULL;
+
+    iteratePropertyAttributes(attrs, findOneStartAttribute, (void*)name, &result);
 
     return result;
 }
