@@ -251,7 +251,7 @@ static inline BOOL objc_test_class_flag(struct objc_class *aClass,
 /**
  * Adds a class to the class table.
  */
-void class_table_insert(Class class);
+void class_table_insert(Class cls);
 
 /**
  * Array of classes used for small objects.  Small objects are embedded in

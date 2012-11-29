@@ -29,44 +29,44 @@ typedef struct _Unwind_Context _Unwind_Context;
 
 typedef uint32_t _Unwind_EHT_Header;
 
-struct _Unwind_Exception
-{
-	uint64_t exception_class;
+typedef unsigned _Unwind_Word __attribute__((__mode__(__word__)));
+typedef signed _Unwind_Sword __attribute__((__mode__(__word__)));
+typedef unsigned _Unwind_Ptr __attribute__((__mode__(__pointer__)));
+typedef unsigned _Unwind_Internal_Ptr __attribute__((__mode__(__pointer__)));
+typedef _Unwind_Word _uw;
+typedef unsigned _uw64 __attribute__((mode(__DI__)));
+typedef unsigned _uw16 __attribute__((mode(__HI__)));
+typedef unsigned _uw8 __attribute__((mode(__QI__)));
+
+struct _Unwind_Exception {
+	unsigned long long exception_class;
 	void (*exception_cleanup)(_Unwind_Reason_Code, struct _Unwind_Exception *);
 	/* Unwinder cache, private fields for the unwinder's use */
 	struct
 	{
-		uint32_t reserved1;
-		uint32_t reserved2;
-		uint32_t reserved3;
-		uint32_t reserved4;
-		uint32_t reserved5;
-	/* init reserved1 to 0, then don't touch */
+		_uw reserved1;  /* Forced unwind stop fn, 0 if not forced */
+		_uw reserved2;  /* Personality routine address */
+		_uw reserved3;  /* Saved callsite address */
+		_uw reserved4;  /* Forced unwind stop arg */
+		_uw reserved5;
 	} unwinder_cache;
 	/* Propagation barrier cache (valid after phase 1): */
-	struct
-	{
-		uint32_t sp;
-		uint32_t bitpattern[5];
+	struct {
+		_uw sp;
+		_uw bitpattern[5];
 	} barrier_cache;
 	/* Cleanup cache (preserved over cleanup): */
-	struct
-	{
-		uint32_t bitpattern[4];
+	struct {
+		_uw bitpattern[4];
 	} cleanup_cache;
 	/* Pr cache (for pr's benefit): */
-	struct
-	{
-		/** function start address */
-		uint32_t fnstart;
-		/** pointer to EHT entry header word */
-		_Unwind_EHT_Header *ehtp;
-		/** additional data */
-		uint32_t additional;
-		uint32_t reserved1;
+	struct {
+		_uw fnstart;			/* function start address */
+		_Unwind_EHT_Header *ehtp;	/* pointer to EHT entry header word */
+		_uw additional;		/* additional data */
+		_uw reserved1;
 	} pr_cache;
-	/** Force alignment of next item to 8-byte boundary */
-	long long int :0;
+	long long int :0;	/* Force alignment to 8-byte boundary */
 };
 
 /* Unwinding functions */
@@ -76,19 +76,19 @@ void _Unwind_Complete(struct _Unwind_Exception *ucbp);
 void _Unwind_DeleteException(struct _Unwind_Exception *ucbp);
 void *_Unwind_GetLanguageSpecificData(struct _Unwind_Context*);
 
-typedef enum
-{
+typedef enum {
 	_UVRSR_OK = 0,
 	_UVRSR_NOT_IMPLEMENTED = 1,
 	_UVRSR_FAILED = 2
 } _Unwind_VRS_Result;
-typedef enum
-{
+
+typedef enum {
 	_UVRSC_CORE = 0,
 	_UVRSC_VFP = 1,
 	_UVRSC_WMMXD = 3,
 	_UVRSC_WMMXC = 4
 } _Unwind_VRS_RegClass;
+
 typedef enum
 {
 	_UVRSD_UINT32 = 0,

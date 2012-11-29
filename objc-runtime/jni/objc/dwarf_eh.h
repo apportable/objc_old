@@ -5,6 +5,8 @@
 #include <assert.h>
 #include <stdint.h>
 
+__BEGIN_DECLS
+
 // _GNU_SOURCE must be defined for unwind.h to expose some of the functions
 // that we want.  If it isn't, then we define it and undefine it to make sure
 // that it doesn't impact the rest of the program.
@@ -321,3 +323,5 @@ static struct dwarf_eh_action
 }
 
 #define EXCEPTION_CLASS(a,b,c,d,e,f,g,h) (((uint64_t)a << 56) + ((uint64_t)b << 48) + ((uint64_t)c << 40) + ((uint64_t)d << 32) + ((uint64_t)e << 24) + ((uint64_t)f << 16) + ((uint64_t)g << 8) + ((uint64_t)h))
+
+__END_DECLS

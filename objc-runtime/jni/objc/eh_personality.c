@@ -207,6 +207,8 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 		DEBUG_LOG("Filter: %d\n", filter);
 		if (filter > 0)
 		{
+//class type accessors are busted, treat them as a catchall_id
+#if 0
 			Class type = get_type_table_entry(context, lsda, filter);
 			DEBUG_LOG("%p type: %d\n", type, !foreignException);
 			// Catchall
@@ -221,7 +223,9 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 				DEBUG_LOG("Found id catch\n");
 				if (!foreignException)
 				{
+#endif
 					return handler_catchall_id;
+#if 0
 				}
 			}
 			else if (!foreignException && isKindOfClass(thrown_class, type))
@@ -233,6 +237,7 @@ static handler_type check_action_record(struct _Unwind_Context *context,
 			{
 				return handler_class;
 			}
+#endif
 		}
 		else if (filter == 0)
 		{
@@ -407,10 +412,9 @@ BEGIN_PERSONALITY_FUNCTION(__gnu_objc_personality_v0)
 		free(ex);
 	}
 
-	_Unwind_SetIP(context, (unsigned long)action.landing_pad);
-	_Unwind_SetGR(context, __builtin_eh_return_data_regno(0), 
-			(unsigned long)object);
+	_Unwind_SetGR(context, __builtin_eh_return_data_regno(0), __builtin_extend_pointer(exceptionObject));
 	_Unwind_SetGR(context, __builtin_eh_return_data_regno(1), selector);
+	_Unwind_SetIP(context, (unsigned long)action.landing_pad);
 
 	return _URC_INSTALL_CONTEXT;
 }
