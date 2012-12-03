@@ -466,14 +466,15 @@ unsigned objc_get_type_qualifiers (const char *type)
 	} while (1);
 }
 
-struct objc_struct_layout
+objc_layout_t objc_create_layout()
 {
-	const char *original_type;
-	const char *type;
-	const char *prev_type;
-	unsigned int record_size;
-	unsigned int record_align;
-};
+	return (objc_layout_t)malloc(sizeof(struct objc_struct_layout));
+}
+
+void objc_destroy_layout(objc_layout_t layout)
+{
+	free(layout);
+}
 
 // Note: The implementations of these functions is horrible.
 void objc_layout_structure (const char *type,

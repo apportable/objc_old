@@ -5,9 +5,6 @@
 #include "ivar.h"
 #include "visibility.h"
 
-ptrdiff_t objc_alignof_type(const char *);
-ptrdiff_t objc_sizeof_type(const char *);
-
 PRIVATE void objc_compute_ivar_offsets(Class class)
 {
 	int i = 0;

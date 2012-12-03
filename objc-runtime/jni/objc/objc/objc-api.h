@@ -27,8 +27,6 @@
 #ifndef _OBJC_OBJC_API_H_
 #define _OBJC_OBJC_API_H_
 
-#include <objc/runtime.h>
-
 #ifndef __has_feature
 #   define __has_feature(x) 0
 #endif
