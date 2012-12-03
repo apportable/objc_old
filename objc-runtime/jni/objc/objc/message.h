@@ -5,9 +5,10 @@
 #ifndef __LIBOBJC_MESSAGE_H_INCLUDED__
 #define __LIBOBJC_MESSAGE_H_INCLUDED__
 
-void objc_msgSend(/* id self, SEL op, ... */ void);
-void objc_msgSend_stret(/* id self, SEL op, ... */ void);
-void objc_msgSend_fpret(/* id self, SEL op, ... */ void);
+// built-in with clang
+// void objc_msgSend(/* id self, SEL op, ... */ void);
+// void objc_msgSend_stret(/* id self, SEL op, ... */ void);
+// void objc_msgSend_fpret(/* id self, SEL op, ... */ void);
 
 
 #endif //__LIBOBJC_MESSAGE_H_INCLUDED__
