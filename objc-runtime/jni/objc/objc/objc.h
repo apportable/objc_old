@@ -27,7 +27,7 @@ typedef signed char BOOL;
 # if __has_feature(cxx_nullptr)
 #   define Nil nullptr
 # else
-#   define Nil (Class)((void *)0)
+#   define Nil ((void *)0)
 # endif
 #endif
 
@@ -35,7 +35,7 @@ typedef signed char BOOL;
 # if __has_feature(cxx_nullptr)
 #   define nil nullptr
 # else
-#   define nil (id)((void *)0)
+#   define nil ((void *)0)
 # endif
 #endif
 
