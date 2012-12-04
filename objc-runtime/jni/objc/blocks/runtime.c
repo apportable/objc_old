@@ -28,6 +28,9 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#import <objc/runtime.h>
+
+extern id objc_msgSend(id self, SEL _cmd, ...);
 
 #ifdef HAVE_AVAILABILITY_MACROS_H
 #include <AvailabilityMacros.h>
@@ -190,10 +193,12 @@ static void _Block_do_nothing(const void *aBlock) { }
 
 static void _Block_retain_object_default(const void *ptr) {
     if (!ptr) return;
+    objc_msgSend((id)ptr, sel_getUid("retain"));
 }
 
 static void _Block_release_object_default(const void *ptr) {
     if (!ptr) return;
+    objc_msgSend((id)ptr, sel_getUid("release"));
 }
 
 static void _Block_assign_weak_default(const void *ptr, void *dest) {
