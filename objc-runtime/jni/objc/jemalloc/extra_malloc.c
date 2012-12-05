@@ -1,6 +1,7 @@
 
 #include <string.h>
 #include <pthread.h>
+#include <android/log.h>
 
 #ifdef MOZ_MEMORY_ANDROID
 #define wrap(a) __wrap_ ## a
@@ -80,4 +81,16 @@ void wrap(pthread_exit)(void *value_ptr) __attribute__((weak));
 void wrap(pthread_exit)(void *value_ptr)
 {
     real(pthread_exit)(value_ptr);
+}
+
+char *__printf_tag = "printf";
+
+void __wrap_printf(const char *format, ...)
+{
+#ifndef NDEBUG
+    va_list args;
+    va_start(args, format);
+    __android_log_vprint(ANDROID_LOG_INFO, __printf_tag, format, args);
+    va_end(args);
+#endif
 }
