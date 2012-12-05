@@ -83,7 +83,7 @@ void wrap(pthread_exit)(void *value_ptr)
     real(pthread_exit)(value_ptr);
 }
 
-char *__printf_tag = "printf";
+const char *__printf_tag = "printf";
 
 void __wrap_printf(const char *format, ...)
 {
