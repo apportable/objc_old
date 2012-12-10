@@ -9,23 +9,10 @@ extern "C" {
 #	define __GNUSTEP_RUNTIME__
 #endif
 
-#ifndef __has_feature
-#	define __has_feature(x) 0
-#endif
-
-#ifndef __unsafe_unretained
-#	ifndef __has_feature
-#		define __unsafe_unretained
-#	elif !__has_feature(objc_arc)
-#		define __unsafe_unretained
-#	endif
-#endif
-
 // Make sure we get the limit macros, even in C++ mode
 #ifndef __STDC_LIMIT_MACROS                                                     
 #	define __STDC_LIMIT_MACROS 1
 #endif
-
 
 #include <objc/objc.h>
 #include <stdarg.h>
@@ -185,31 +172,6 @@ typedef struct
 	 */
 	const char *value;
 } objc_property_attribute_t;
-
-
-
-#ifndef YES
-#	define YES ((BOOL)1)
-#endif
-#ifndef NO
-#	define NO ((BOOL)0)
-#endif
-
-#ifdef __GNUC
-#	define _OBJC_NULL_PTR __null
-#elif defined(__cplusplus)
-#	define _OBJC_NULL_PTR 0
-#else
-#	define _OBJC_NULL_PTR ((void*)0)
-#endif
-
-#ifndef nil
-#	define nil (_OBJC_NULL_PTR)
-#endif
-
-#ifndef Nil
-#	define Nil ((Class)_OBJC_NULL_PTR)
-#endif
 
 #include "slot.h"
 
