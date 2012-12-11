@@ -21,7 +21,7 @@ header_paths = [
 ]
 
 deps = [
-
+    'v'
 ]
 
 sources = [
@@ -63,6 +63,7 @@ sources = [
 
 libs = [
     'gnustl_shared',
+    'v'
 ]
 
 Import('env')
