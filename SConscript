@@ -53,8 +53,6 @@ sources = [
     'objc-runtime/jni/objc/selector_table.c',
     'objc-runtime/jni/objc/sendmsg2.c',
     'objc-runtime/jni/objc/statics_loader.c',
-    'objc-runtime/jni/objc/jemalloc/jemalloc.c',
-    'objc-runtime/jni/objc/jemalloc/extra_malloc.c',
     'objc-runtime/jni/objc/objc-properties.m',
     'objc-runtime/jni/objc/objcxx_eh.cc',
     {'source' : 'objc-runtime/jni/objc/objc_msgSend.arm.S', 'env' : {'TARGET_ARCH' : 'arm'}},
