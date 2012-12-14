@@ -12,7 +12,7 @@
 /**
  * Runtime lock.  This is exposed in 
  */
-PRIVATE mutex_t runtime_mutex;
+PRIVATE mutex_t INIT_LOCK(runtime_mutex);
 LEGACY void *__objc_runtime_mutex = &runtime_mutex;
 
 void init_alias_table(void);
@@ -39,6 +39,7 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 
 	if (first_run)
 	{
+		first_run = NO;
 #if ENABLE_GC
 		init_gc();
 #endif
@@ -52,7 +53,7 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 		// pure-C main() function spawns two threads which then, concurrently,
 		// call dlopen() or equivalent, and the platform's implementation of
 		// this does not perform any synchronization.
-		INIT_LOCK(runtime_mutex);
+		
 		// Create the various tables that the runtime needs.
 		init_selector_tables();
 		init_protocol_table();
@@ -61,7 +62,6 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 		init_alias_table();
 		init_arc();
 		//init_trampolines();
-		first_run = NO;
 	}
 
 	// The runtime mutex is held for the entire duration of a load.  It does

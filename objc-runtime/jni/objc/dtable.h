@@ -63,7 +63,7 @@ static inline dtable_t dtable_for_class(Class cls)
 	dtable_t dtable = uninstalled_dtable;
 
 	{
-		LOCK_FOR_SCOPE(&initialize_lock);
+		LOCK_RUNTIME_FOR_SCOPE();
 		if (classHasInstalledDtable(cls))
 		{
 			return cls->dtable;

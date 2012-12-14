@@ -17,7 +17,7 @@ PRIVATE dtable_t uninstalled_dtable;
 /** Head of the list of temporary dtables.  Protected by initialize_lock. */
 PRIVATE InitializingDtable *temporary_dtables;
 /** Lock used to protect the temporary dtables list. */
-PRIVATE mutex_t initialize_lock;
+PRIVATE mutex_t INIT_LOCK(initialize_lock);
 /** The size of the largest dtable, rounded up to the nearest power of two. */
 static uint32_t dtable_depth = 8;
 
@@ -110,7 +110,7 @@ static void update_dtable(dtable_t dtable);
 
 PRIVATE void init_dispatch_tables ()
 {
-	INIT_LOCK(initialize_lock);
+	
 }
 
 Class class_getSuperclass(Class);

@@ -27,7 +27,7 @@ typedef pthread_mutex_t mutex_t;
 //	elif defined(PTHREAD_RECURSIVE_MUTEX_INITIALIZER)
 //		define INIT_LOCK(x) do{x = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;}while(0)
 //	else
-#		define INIT_LOCK(x) do{init_recursive_mutex(&(x));}while(0)
+#		define INIT_LOCK(x) x = (mutex_t)PTHREAD_RECURSIVE_MUTEX_INITIALIZER
 
 static inline void init_recursive_mutex(pthread_mutex_t *x)
 {

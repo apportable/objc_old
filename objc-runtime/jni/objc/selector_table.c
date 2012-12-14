@@ -223,7 +223,7 @@ static selector_table *sel_table;
 /**
  * Lock protecting the selector table.
  */
-mutex_t selector_table_lock;
+mutex_t INIT_LOCK(selector_table_lock);
 
 
 /**
@@ -238,7 +238,6 @@ void objc_resize_dtables(uint32_t);
 PRIVATE void init_selector_tables()
 {
 	selector_list = SparseArrayNew();
-	INIT_LOCK(selector_table_lock);
 	selector_initialize(&sel_table, 4096);
 }
 
