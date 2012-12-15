@@ -43,17 +43,6 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 #if ENABLE_GC
 		init_gc();
 #endif
-		// Create the main runtime lock.  This is not safe in theory, but in
-		// practice the first time that this function is called will be in the
-		// loader, from the main thread.  Future loaders may run concurrently,
-		// but that is likely to break the semantics of a lot of languages, so
-		// we don't have to worry about it for a long time.
-		//
-		// The only case when this can potentially go badly wrong is when a
-		// pure-C main() function spawns two threads which then, concurrently,
-		// call dlopen() or equivalent, and the platform's implementation of
-		// this does not perform any synchronization.
-		
 		// Create the various tables that the runtime needs.
 		init_selector_tables();
 		init_protocol_table();
@@ -61,7 +50,6 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 		init_dispatch_tables();
 		init_alias_table();
 		init_arc();
-		//init_trampolines();
 	}
 
 	// The runtime mutex is held for the entire duration of a load.  It does

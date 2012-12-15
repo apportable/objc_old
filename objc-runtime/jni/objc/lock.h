@@ -6,15 +6,8 @@
 
 #ifndef __LIBOBJC_LOCK_H_INCLUDED__
 #define __LIBOBJC_LOCK_H_INCLUDED__
-#ifdef WIN32
-#define BOOL _WINBOOL
-#	include <windows.h>
-#undef BOOL
-typedef HANDLE mutex_t;
-#	define INIT_LOCK(x) x = CreateMutex(NULL, FALSE, NULL)
-#	define LOCK(x) WaitForSingleObject(*x, INFINITE)
-#	define UNLOCK(x) ReleaseMutex(*x)
-#	define DESTROY_LOCK(x) CloseHandle(*x)
+#if defined(WIN32) && !defined(WIN32_PTHREADS)
+#error WIN32 locking routines are not supported properly without a pthread port
 #else
 
 #	include <pthread.h>
@@ -28,15 +21,6 @@ typedef pthread_mutex_t mutex_t;
 //		define INIT_LOCK(x) do{x = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;}while(0)
 //	else
 #		define INIT_LOCK(x) x = (mutex_t)PTHREAD_RECURSIVE_MUTEX_INITIALIZER
-
-static inline void init_recursive_mutex(pthread_mutex_t *x)
-{
-	pthread_mutexattr_t recursiveAttributes;
-	pthread_mutexattr_init(&recursiveAttributes);
-	pthread_mutexattr_settype(&recursiveAttributes, PTHREAD_MUTEX_RECURSIVE);
-	pthread_mutex_init(x, &recursiveAttributes);
-	pthread_mutexattr_destroy(&recursiveAttributes);
-}
 //	endif
 
 #	define LOCK(x) pthread_mutex_lock(x)
