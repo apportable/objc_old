@@ -13,7 +13,7 @@
   #define __weak
 #endif
 
-typedef unsigned char BOOL;
+typedef signed char BOOL;
 
 #if __has_feature(objc_bool)
 #define YES             __objc_yes
