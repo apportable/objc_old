@@ -521,7 +521,10 @@ id objc_storeWeak(id *addr, id obj)
 					break;
 				}
 			}
-			oldRef = oldRef->next;
+			if (oldRef != NULL)
+			{
+				oldRef = oldRef->next;
+			}
 		}
 	}
 	if (nil == obj)
@@ -550,9 +553,13 @@ id objc_storeWeak(id *addr, id obj)
 			return nil;
 		}
 	}
-	else
+	else if (_objc_weak_load != NULL)
 	{
 		obj = _objc_weak_load(obj);
+	}
+	else
+	{
+		obj = [obj retainCount] > 0 ? obj : nil;
 	}
 	if (nil != obj)
 	{
@@ -641,9 +648,13 @@ id objc_loadWeakRetained(id* addr)
 			return nil;
 		}
 	}
-	else
+	else if (_objc_weak_load != NULL)
 	{
 		obj = _objc_weak_load(obj);
+	}
+	else
+	{
+		obj = [obj retainCount] > 0 ? obj : nil;
 	}
 	return objc_retain(obj);
 }
