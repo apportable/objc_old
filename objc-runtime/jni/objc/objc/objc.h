@@ -3,6 +3,35 @@
 
 #include <objc/objc-api.h>
 
+/**
+ * Opaque type used for selectors.
+ */
+#if !defined(__clang__) && !defined(__OBJC_RUNTIME_INTERNAL__)
+typedef const struct objc_selector *SEL;
+#else
+typedef struct objc_selector *SEL;
+#endif
+
+/**
+ * Opaque type for Objective-C classes.
+ */
+typedef struct objc_class *Class;
+
+/**
+ * Type for Objective-C objects.
+ */
+typedef struct objc_object
+{
+    /**
+     * Pointer to this object's class.  Accessing this directly is STRONGLY
+     * discouraged.  You are recommended to use object_getClass() instead.
+     */
+#ifndef __OBJC_RUNTIME_INTERNAL__
+    __attribute__((deprecated))
+#endif
+    Class isa;
+} *id;
+
 #if !__has_feature(objc_arc)
   #define __bridge
   #define __bridge_retained
