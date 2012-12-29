@@ -57,8 +57,6 @@ sources = [
     'objc-runtime/jni/objc/objcxx_eh.cc',
     {'source' : 'objc-runtime/jni/objc/objc_msgSend.arm.S', 'env' : {'TARGET_ARCH' : 'arm'}},
     # {'source' : 'objc-runtime/jni/objc/objc_msgSend.x86-32.S', 'env' : {'TARGET_ARCH' : 'x86'}},
-    {'source' : 'objc-runtime/jni/objc/extra/ffs.c', 'env' : {'TARGET_ARCH' : 'x86', 'TARGET_OS' : 'android'}},
-    {'source' : 'objc-runtime/jni/objc/extra/atexit.c', 'env' : {'TARGET_ARCH' : 'x86', 'TARGET_OS' : 'android'}},
 ]
 
 libs = [
