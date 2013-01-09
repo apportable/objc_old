@@ -359,26 +359,6 @@ PRIVATE void gc_setTypeForClass(Class cls, void *type)
 	list->gc_type = type;
 }
 
-int objc_sync_enter(id object)
-{
-	if (isSmallObject(object)) { return 0; }
-	struct reference_list *list = referenceListForObject(object, YES);
-	LOCK(&list->lock);
-	return 0;
-}
-
-int objc_sync_exit(id object)
-{
-	if (isSmallObject(object)) { return 0; }
-	struct reference_list *list = referenceListForObject(object, NO);
-	if (NULL != list)
-	{
-		UNLOCK(&list->lock);
-		return 0;
-	}
-	return 1;
-}
-
 static Class hiddenClassForObject(id object)
 {
 	if (isSmallObject(object)) { return nil; }

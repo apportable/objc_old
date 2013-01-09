@@ -56,7 +56,6 @@ typedef struct {
 //
 
 static pthread_mutexattr_t	sRecursiveLockAttr;
-static bool			sRecursiveLockAttrIntialized = false;
 
 typedef struct SyncData {
     struct SyncData* nextData;

@@ -55,7 +55,8 @@ sources = [
     'objc-runtime/jni/objc/statics_loader.c',
     'objc-runtime/jni/objc/objc-properties.m',
     'objc-runtime/jni/objc/objcxx_eh.cc',
-    {'source' : 'objc-runtime/jni/objc/objc_msgSend.arm.S', 'env' : {'TARGET_ARCH' : 'arm'}},
+    'objc-runtime/jni/objc/sync.m',
+    {'source' : 'objc-runtime/jni/objc/objc_msgSend.arm.S', 'env' : {'TARGET_ARCH' : 'arm'}, "flags":"-mno-thumb"},
     # {'source' : 'objc-runtime/jni/objc/objc_msgSend.x86-32.S', 'env' : {'TARGET_ARCH' : 'x86'}},
 ]
 
