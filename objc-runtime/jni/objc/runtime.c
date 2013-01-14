@@ -350,6 +350,10 @@ id class_createInstance(Class cls, size_t extraBytes)
 
 id object_copy(id obj, size_t size)
 {
+	if (obj == nil)
+	{
+		return nil;
+	}
 	Class cls = object_getClass(obj);
 	id cpy = class_createInstance(cls, size - class_getInstanceSize(cls));
 	memcpy(((char*)cpy + sizeof(id)), ((char*)obj + sizeof(id)), size - sizeof(id));

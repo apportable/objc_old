@@ -120,7 +120,7 @@ PRIVATE void class_table_insert(Class class)
 		class->unresolved_class_next = unresolved_class_list;
 		unresolved_class_list = class;
 	}
-	if ((0 == zombie_class) && (strcmp("NSZombie", class->name) == 0))
+	if ((0 == zombie_class) && class->name != NULL && (strcmp("NSZombie", class->name) == 0))
 	{
 		zombie_class = class;
 	}
