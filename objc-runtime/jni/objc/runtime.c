@@ -342,7 +342,7 @@ id class_createInstance(Class cls, size_t extraBytes)
 	}
 
 	if (Nil == cls)	{ return nil; }
-	id obj = gc->allocate_class(cls, extraBytes);
+	id obj = calloc(1, class_getInstanceSize(cls) + extraBytes);
 	obj->isa = cls;
 	call_cxx_construct(obj);
 	return obj;
@@ -363,7 +363,7 @@ id object_copy(id obj, size_t size)
 id object_dispose(id obj)
 {
 	call_cxx_destruct(obj);
-	gc->free_object(obj);
+	free(obj);
 	return nil;
 }
 
