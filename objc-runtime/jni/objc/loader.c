@@ -16,7 +16,6 @@ PRIVATE mutex_t INIT_LOCK(runtime_mutex);
 LEGACY void *__objc_runtime_mutex = &runtime_mutex;
 
 void init_alias_table(void);
-void init_arc(void);
 void init_class_tables(void);
 void init_dispatch_tables(void);
 void init_gc(void);
@@ -49,7 +48,6 @@ void __objc_exec_class(struct objc_module_abi_8 *module)
 		init_class_tables();
 		init_dispatch_tables();
 		init_alias_table();
-		init_arc();
 	}
 
 	// The runtime mutex is held for the entire duration of a load.  It does

@@ -27,7 +27,10 @@ deps = [
 sources = [
     'objc-runtime/jni/objc/abi_version.c',
     'objc-runtime/jni/objc/alias_table.c',
-    'objc-runtime/jni/objc/arc.m',
+    # 'objc-runtime/jni/objc/NSObject.m',
+    'objc-runtime/jni/objc/objc-weak.c',
+    'objc-runtime/jni/objc/objc-tls.c',
+    'objc-runtime/jni/objc/objc-arr.m',
     'objc-runtime/jni/objc/associate.m',
     'objc-runtime/jni/objc/blocks/data.c',
     'objc-runtime/jni/objc/blocks/runtime.c',
