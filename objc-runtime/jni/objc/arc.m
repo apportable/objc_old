@@ -162,40 +162,15 @@ extern BOOL FastARCRetain;
 extern BOOL FastARCRelease;
 extern BOOL FastARCAutorelease;
 
-static BOOL useARCAutoreleasePool;
-
 static inline id retain(id obj)
 {
 	if (isSmallObject(obj)) { return obj; }
-	Class cls = obj->isa;
-	if ((Class)&_NSConcreteMallocBlock == cls ||
-	    (Class)&_NSConcreteStackBlock == cls)
-	{
-		return Block_copy(obj);
-	}
-	if (objc_test_class_flag(cls, objc_class_flag_fast_arc))
-	{
-		intptr_t *refCount = ((intptr_t*)obj) - 1;
-		__sync_add_and_fetch(refCount, 1);
-		return obj;
-	}
 	return [obj retain];
 }
 
 static inline void release(id obj)
 {
 	if (isSmallObject(obj)) { return; }
-	Class cls = obj->isa;
-	if (objc_test_class_flag(cls, objc_class_flag_fast_arc))
-	{
-		intptr_t *refCount = ((intptr_t*)obj) - 1;
-		if (__sync_sub_and_fetch(refCount, 1) < 0)
-		{
-			objc_delete_weak_refs(obj);
-			[obj dealloc];
-		}
-		return;
-	}
 	[obj release];
 }
 
@@ -204,142 +179,29 @@ static inline void initAutorelease(void)
 	if (Nil == AutoreleasePool)
 	{
 		AutoreleasePool = objc_getRequiredClass("NSAutoreleasePool");
-		if (Nil == AutoreleasePool)
-		{
-			useARCAutoreleasePool = YES;
-		}
-		else
-		{
-			[AutoreleasePool class];
-			useARCAutoreleasePool = class_respondsToSelector(AutoreleasePool,
-			                                                 SELECTOR(_ARCCompatibleAutoreleasePool));
-			NewAutoreleasePool = class_getMethodImplementation(object_getClass(AutoreleasePool),
-			                                                   SELECTOR(new));
-			DeleteAutoreleasePool = class_getMethodImplementation(AutoreleasePool,
-			                                                      SELECTOR(release));
-			AutoreleaseAdd = class_getMethodImplementation(object_getClass(AutoreleasePool),
-			                                               SELECTOR(addObject:));
-		}
+		[AutoreleasePool class];
+		NewAutoreleasePool = class_getMethodImplementation(object_getClass(AutoreleasePool),
+		                                                   SELECTOR(new));
+		DeleteAutoreleasePool = class_getMethodImplementation(AutoreleasePool,
+		                                                      SELECTOR(release));
+		AutoreleaseAdd = class_getMethodImplementation(object_getClass(AutoreleasePool),
+		                                               SELECTOR(addObject:));
 	}
 }
 
 static inline id autorelease(id obj)
 {
-	//fprintf(stderr, "Autoreleasing %p\n", obj);
-	if (useARCAutoreleasePool)
-	{
-		struct arc_tls *tls = getARCThreadData();
-		if (NULL != tls)
-		{
-			struct arc_autorelease_pool *pool = tls->pool;
-			if (NULL == pool || (pool->insert >= &pool->pool[POOL_SIZE]))
-			{
-				pool = calloc(sizeof(struct arc_autorelease_pool), 1);
-				pool->previous = tls->pool;
-				pool->insert = pool->pool;
-				tls->pool = pool;
-			}
-			arp_count++;
-			*pool->insert = obj;
-			pool->insert++;
-			return obj;
-		}
-	}
-	if (objc_test_class_flag(classForObject(obj), objc_class_flag_fast_arc))
-	{
-		initAutorelease();
-		if (0 != AutoreleaseAdd)
-		{
-			AutoreleaseAdd(AutoreleasePool, SELECTOR(addObject:), obj);
-		}
-		return obj;
-	}
 	return [obj autorelease];
 }
 
-unsigned long objc_arc_autorelease_count_np(void)
-{
-	struct arc_tls* tls = getARCThreadData();
-	unsigned long ar_count = 0;
-	if (!tls) { return 0; }
-
-	for (struct arc_autorelease_pool *pool=tls->pool ;
-	     NULL != pool ;
-	     pool = pool->previous)
-	{
-		ar_count += (((intptr_t)pool->insert) - ((intptr_t)pool->pool)) / sizeof(id);
-	}
-	return ar_count;
-}
-unsigned long objc_arc_autorelease_count_for_object_np(id obj)
-{
-	struct arc_tls* tls = getARCThreadData();
-	unsigned long ar_count = 0;
-	if (!tls) { return 0; }
-
-	for (struct arc_autorelease_pool *pool=tls->pool ;
-	     NULL != pool ;
-	     pool = pool->previous)
-	{
-		for (id* o = pool->insert-1 ; o >= pool->pool ; o--)
-		{
-			if (*o == obj)
-			{
-				ar_count++;
-			}
-		}
-	}
-	return ar_count;
-}
-
-
 void *objc_autoreleasePoolPush(void)
 {
-	initAutorelease();
-	struct arc_tls* tls = getARCThreadData();
-	// If there is an object in the return-retained slot, then we need to
-	// promote it to the real autorelease pool BEFORE pushing the new
-	// autorelease pool.  If we don't, then it may be prematurely autoreleased.
-	if ((NULL != tls) && (nil != tls->returnRetained))
-	{
-		autorelease(tls->returnRetained);
-		tls->returnRetained = nil;
-	}
-	if (useARCAutoreleasePool)
-	{
-		if (NULL != tls)
-		{
-			struct arc_autorelease_pool *pool = tls->pool;
-			if (NULL == pool || (pool->insert >= &pool->pool[POOL_SIZE]))
-			{
-				pool = calloc(sizeof(struct arc_autorelease_pool), 1);
-				pool->previous = tls->pool;
-				pool->insert = pool->pool;
-				tls->pool = pool;
-			}
-			// If there is no autorelease pool allocated for this thread, then
-			// we lazily allocate one the first time something is autoreleased.
-			return (NULL != tls->pool) ? tls->pool->insert : NULL;
-		}
-	}
 	initAutorelease();
 	if (0 == NewAutoreleasePool) { return NULL; }
 	return NewAutoreleasePool(AutoreleasePool, SELECTOR(new));
 }
 void objc_autoreleasePoolPop(void *pool)
 {
-	if (useARCAutoreleasePool)
-	{
-		struct arc_tls* tls = getARCThreadData();
-		if (NULL != tls)
-		{
-			if (NULL != tls->pool)
-			{
-				emptyPool(tls, pool);
-			}
-			return;
-		}
-	}
 	DeleteAutoreleasePool(pool, SELECTOR(release));
 	struct arc_tls* tls = getARCThreadData();
 	if (tls && tls->returnRetained)
@@ -360,48 +222,11 @@ id objc_autorelease(id obj)
 
 id objc_autoreleaseReturnValue(id obj)
 {
-	if (!useARCAutoreleasePool) 
-	{
-		struct arc_tls* tls = getARCThreadData();
-		if (NULL != tls)
-		{
-			objc_autorelease(tls->returnRetained);
-			tls->returnRetained = obj;
-			return obj;
-		}
-	}
 	return objc_autorelease(obj);
 }
 
 id objc_retainAutoreleasedReturnValue(id obj)
 {
-	// If the previous object was released  with objc_autoreleaseReturnValue()
-	// just before return, then it will not have actually been autoreleased.
-	// Instead, it will have been stored in TLS.  We just remove it from TLS
-	// and undo the fake autorelease.
-	//
-	// If the object was not returned with objc_autoreleaseReturnValue() then
-	// we actually autorelease the fake object. and then retain the argument.
-	// In tis case, this is equivalent to objc_retain().
-	struct arc_tls* tls = getARCThreadData();
-	if (NULL != tls)
-	{
-		// If we're using our own autorelease pool, just pop the object from the top
-		if (useARCAutoreleasePool)
-		{
-			if ((NULL != tls->pool) &&
-			    (*(tls->pool->insert-1) == obj))
-			{
-				tls->pool->insert--;
-				return obj;
-			}
-		}
-		else if (obj == tls->returnRetained)
-		{
-			tls->returnRetained = NULL;
-			return obj;
-		}
-	}
 	return objc_retain(obj);
 }
 
