@@ -1,5 +1,6 @@
 #import <objc/runtime.h>
 #import <assert.h>
+#import <Block.h>
 #import "class.h"
 #import "objc-tls.h"
 #import "objc-fastarr.h"
@@ -83,6 +84,11 @@ __attribute__((aligned(16))) id objc_retain(id obj)
     }
     // TODO: add customRR flag to clang codegen
     return [obj retain];
+}
+
+void *objc_retainBlock(void *block)
+{
+    return _Block_copy(block);
 }
 
 __attribute__((aligned(16))) id objc_autorelease(id obj)
