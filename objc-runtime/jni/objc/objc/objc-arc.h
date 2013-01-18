@@ -46,7 +46,7 @@ id objc_retainAutoreleasedReturnValue(id obj);
 /**
  * Retains a block.
  */
-id objc_retainBlock(id b);
+void* objc_retainBlock(void* b);
 /**
  * Stores value in addr.  This first retains value, then releases the old value
  * at addr, and stores the retained value in the address.
