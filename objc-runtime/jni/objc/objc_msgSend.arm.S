@@ -24,13 +24,13 @@
 	                                       // These are callee-save, so the unwind library
 	                                       // must be able to restore them, so we need CFI
 	                                       // directives for them, but not for any other pushes
-	tst    \receiver, SMALLOBJ_MASK        // Sets Z if this is not a small int
+#	tst    \receiver, SMALLOBJ_MASK        // Sets Z if this is not a small int
 
 
-	ldrne  r4, LSmallIntClass              // Small Int class -> r4 if this is a small int
-	ldrne  r4, [r4]
+#	ldrne    r4, LSmallIntClass              // Small Int class -> r4 if this is a small int
+#	ldrne  r4, [r4]
 
-	ldreq  r4, [\receiver]                 // Load class to r4 if not a small int
+	ldr    r4, [\receiver]                 // Load class to r4 if not a small int
 
 	ldr    r4, [r4, #DTABLE_OFFSET]        // Dtable -> r4
 
