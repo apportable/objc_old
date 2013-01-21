@@ -1,5 +1,6 @@
 flags = [
-    '-frtti'
+    '-frtti',
+    '-Wno-deprecated-objc-isa-usage'
 ]
 
 defines = {
