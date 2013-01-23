@@ -859,20 +859,13 @@ void objc_removeAssociatedObjects(id object);
  * take an object pointer (self) as its first argument, and then the same
  * arguments as the method.
  */
-IMP imp_implementationWithBlock(void *block);
-/**
- * Returns the type encoding of an IMP that would be returned by passing the
- * block to imp_implementationWithBlock().  Returns NULL if this is not a valid
- * block encoding for transforming to an IMP (it must take id as its first
- * argument).  The caller is responsible for freeing the returned value.
- */
-char *block_copyIMPTypeEncoding_np(void*block);
+IMP imp_implementationWithBlock(id block);
 /**
  * Returns the block that was used in an IMP created by
  * imp_implementationWithBlock().  The result of calling this function with any
  * other IMP is undefined.
  */
-void *imp_getBlock(IMP anImp);
+id imp_getBlock(IMP anImp);
 /**
  * Removes a block that was converted to an IMP with
  * imp_implementationWithBlock().  The result of calling this function with any

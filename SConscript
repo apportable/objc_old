@@ -60,6 +60,8 @@ sources = [
     'objc-runtime/jni/objc/objc-properties.m',
     'objc-runtime/jni/objc/objcxx_eh.cc',
     'objc-runtime/jni/objc/sync.m',
+    'objc-runtime/jni/objc/block_trampolines.S',
+    'objc-runtime/jni/objc/block_to_imp.c',
     {'source' : 'objc-runtime/jni/objc/objc_msgSend.arm.S', 'env' : {'TARGET_ARCH' : 'arm'}, "flags":"-mno-thumb"},
     # {'source' : 'objc-runtime/jni/objc/objc_msgSend.x86-32.S', 'env' : {'TARGET_ARCH' : 'x86'}},
 ]
