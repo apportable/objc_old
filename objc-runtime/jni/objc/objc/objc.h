@@ -32,14 +32,28 @@ typedef struct objc_object
     Class isa;
 } *id;
 
-#if !__has_feature(objc_arc)
-  #define __bridge
-  #define __bridge_retained
-  #define __bridge_transfer
-  #define __autoreleasing
-  #define __strong
-  #define __unsafe_unretained
-  #define __weak
+typedef const void* objc_objectptr_t;
+
+#if __has_feature(objc_arc)
+
+#define objc_retainedObject(o) ((__bridge_transfer id)(objc_objectptr_t)(o))
+#define objc_unretainedObject(o) ((__bridge id)(objc_objectptr_t)(o))
+#define objc_unretainedPointer(o) ((__bridge objc_objectptr_t)(id)(o))
+
+#else
+
+#define __bridge
+#define __bridge_retained
+#define __bridge_transfer
+#define __autoreleasing
+#define __strong
+#define __unsafe_unretained
+#define __weak
+
+#define objc_retainedObject(o) ((id)(objc_objectptr_t)(o))
+#define objc_unretainedObject(o) ((id)(objc_objectptr_t)(o))
+#define objc_unretainedPointer(o) ((objc_objectptr_t)(id)(o))
+
 #endif
 
 typedef signed char BOOL;
