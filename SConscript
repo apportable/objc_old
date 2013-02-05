@@ -5,6 +5,7 @@ flags = [
 
 defines = {
     'TYPE_DEPENDENT_DISPATCH' : 1,
+    'SUPPORT_ZEROCOST_EXCEPTIONS' : 1,
     'GNUSTEP' : 1,
     '_XOPEN_SOURCE' : 500,
     '__OBJC_RUNTIME_INTERNAL__' : 1,
@@ -22,7 +23,8 @@ header_paths = [
 ]
 
 deps = [
-    'v'
+    'v',
+    'cxx',
 ]
 
 sources = [
@@ -39,7 +41,7 @@ sources = [
     'objc-runtime/jni/objc/category_loader.c',
     'objc-runtime/jni/objc/class_table.c',
     'objc-runtime/jni/objc/dtable.c',
-    'objc-runtime/jni/objc/eh_personality.c',
+    # 'objc-runtime/jni/objc/eh_personality.c',
     'objc-runtime/jni/objc/encoding2.c',
     'objc-runtime/jni/objc/gc_none.c',
     'objc-runtime/jni/objc/hash_table.c',
@@ -58,7 +60,8 @@ sources = [
     'objc-runtime/jni/objc/sendmsg2.c',
     'objc-runtime/jni/objc/statics_loader.c',
     'objc-runtime/jni/objc/objc-properties.m',
-    'objc-runtime/jni/objc/objcxx_eh.cc',
+    # 'objc-runtime/jni/objc/objcxx_eh.cc',
+    'objc-runtime/jni/objc/objc-exception.mm',
     'objc-runtime/jni/objc/sync.m',
     'objc-runtime/jni/objc/block_trampolines.S',
     'objc-runtime/jni/objc/block_to_imp.c',
@@ -67,8 +70,8 @@ sources = [
 ]
 
 libs = [
-    'gnustl_shared',
-    'v'
+    'v',
+    'cxx',
 ]
 
 Import('env')
