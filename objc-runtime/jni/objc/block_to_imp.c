@@ -29,12 +29,8 @@ static struct wx_buffer alloc_buffer(size_t size, void *ctx)
 	LOCK_FOR_SCOPE(&trampoline_lock);
 	if ((0 == offset) || (offset + size >= PAGE_SIZE))
 	{
-		char name[32];
-		snprintf(name, 32, "objc_block_trampoline_%p", ctx);
-		int fd = shmem_create_region(name, PAGE_SIZE);
-		void *w = mmap(NULL, PAGE_SIZE, PROT_WRITE, MAP_SHARED, fd, 0);
-		executeBuffer = mmap(NULL, PAGE_SIZE, PROT_READ|PROT_EXEC, MAP_SHARED, fd, 0);
-		close(fd);
+		void *w = mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_SHARED, -1, 0);
+		executeBuffer = w;
 		*((void**)w) = writeBuffer;
 		writeBuffer = w;
 		offset = sizeof(void*);
