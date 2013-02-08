@@ -30,6 +30,11 @@ static struct wx_buffer alloc_buffer(size_t size, void *ctx)
 	if ((0 == offset) || (offset + size >= PAGE_SIZE))
 	{
 		void *w = mmap(NULL, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC, MAP_ANON|MAP_SHARED, -1, 0);
+		if (UNLIKELY(w == (void *)-1))
+		{
+			struct wx_buffer invalid = { NULL,  NULL };
+			return invalid;
+		}
 		executeBuffer = w;
 		*((void**)w) = writeBuffer;
 		writeBuffer = w;
@@ -44,6 +49,12 @@ extern void __objc_block_trampoline;
 extern void __objc_block_trampoline_end;
 extern void __objc_block_trampoline_sret;
 extern void __objc_block_trampoline_end_sret;
+
+static unsigned long long massive_failure_imp(id self, SEL _cmd, ...)
+{
+	DEBUG_LOG("There has been a catastrophic failure in the objc runtime, set a breakpoint at massive_failure_imp to debug");
+	return 0ULL;
+}
 
 IMP imp_implementationWithBlock(id block)
 {
@@ -68,6 +79,10 @@ IMP imp_implementationWithBlock(id block)
 	if (0 >= trampolineSize) { return 0; }
 
 	struct wx_buffer buf = alloc_buffer(trampolineSize + 2*sizeof(void*), block);
+	if (UNLIKELY(buf.w == NULL || buf.x == NULL))
+	{
+		return (IMP)&massive_failure_imp;
+	}
 	void **out = buf.w;
 	out[0] = (void*)b->invoke;
 	out[1] = Block_copy(b);
