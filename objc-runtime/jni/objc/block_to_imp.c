@@ -87,6 +87,9 @@ IMP imp_implementationWithBlock(id block)
 	out[0] = (void*)b->invoke;
 	out[1] = Block_copy(b);
 	memcpy(&out[2], start, trampolineSize);
+#ifdef ANDROID
+        cacheflush((long)&out[2], (long)&out[2] + trampolineSize, 0);
+#endif
 	out = buf.x;
 	return (IMP)&out[2];
 }
