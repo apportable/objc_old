@@ -5,10 +5,17 @@
 #ifndef __LIBOBJC_MESSAGE_H_INCLUDED__
 #define __LIBOBJC_MESSAGE_H_INCLUDED__
 
-// built-in with clang
-// void objc_msgSend(/* id self, SEL op, ... */ void);
-// void objc_msgSend_stret(/* id self, SEL op, ... */ void);
-// void objc_msgSend_fpret(/* id self, SEL op, ... */ void);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// These are Clang built-in's
+id objc_msgSend(id self, SEL op, ...);
+id objc_msgSend_stret(id self, SEL op, ...);
+
+#ifdef __cplusplus
+}
+#endif
 
 
 #endif //__LIBOBJC_MESSAGE_H_INCLUDED__
