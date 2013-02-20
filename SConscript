@@ -32,7 +32,7 @@ sources = [
     'objc-runtime/jni/objc/objc-weak.c',
     'objc-runtime/jni/objc/objc-tls.c',
     'objc-runtime/jni/objc/objc-arr.m',
-    'objc-runtime/jni/objc/associate.m',
+    'objc-runtime/jni/objc/associations.m',
     'objc-runtime/jni/objc/blocks/data.c',
     'objc-runtime/jni/objc/blocks/runtime.c',
     'objc-runtime/jni/objc/caps.c',
