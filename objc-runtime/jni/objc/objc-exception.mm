@@ -637,7 +637,7 @@ extern "C" void objc_exception_throw(id obj) __attribute__((visibility("default"
     __builtin_trap();
 }
 
-
+extern "C" void objc_exception_rethrow(void) __attribute__((visibility("default")));
 void objc_exception_rethrow(void)
 {
     // exception_preprocessor doesn't get another bite of the apple
@@ -650,7 +650,7 @@ void objc_exception_rethrow(void)
     __builtin_trap();
 }
 
-
+extern "C" id objc_begin_catch(void *exc_gen) __attribute__((visibility("default")));
 id objc_begin_catch(void *exc_gen)
 {
     if (PrintExceptions) {
@@ -661,7 +661,7 @@ id objc_begin_catch(void *exc_gen)
     return (id)__cxa_begin_catch(exc_gen);
 }
 
-
+extern "C" void objc_end_catch(void) __attribute__((visibility("default")));
 void objc_end_catch(void)
 {
     if (PrintExceptions) {
