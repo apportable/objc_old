@@ -88,14 +88,7 @@ void objc_setProperty(id obj, SEL _cmd, ptrdiff_t offset, id arg, BOOL isAtomic,
 	objc_release(old);
 }
 
-/**
- * Structure copy function.  This is provided for compatibility with the Apple
- * APIs (it's an ABI function, so it's semi-public), but it's a bad design so
- * it's not used.  The problem is that it does not identify which of the
- * pointers corresponds to the object, which causes some excessive locking to
- * be needed.
- */
-void objc_copyPropertyStruct(void *dest,
+void objc_copyStruct(void *dest,
                              void *src,
                              ptrdiff_t size,
                              BOOL atomic,
@@ -104,65 +97,25 @@ void objc_copyPropertyStruct(void *dest,
 	if (atomic)
 	{
 		volatile int *lock = lock_for_pointer(src);
-		volatile int *lock2 = lock_for_pointer(src);
+		volatile int *lock2 = lock_for_pointer(dest);
+		if (lock > lock2) {
+			lock = lock2;
+			lock2 = lock_for_pointer(src);
+		}
+		else if (lock == lock2){
+			lock2 = NULL;
+		}
 		lock_spinlock(lock);
-		lock_spinlock(lock2);
+		if (lock2) lock_spinlock(lock2);
 		memcpy(dest, src, size);
 		unlock_spinlock(lock);
-		unlock_spinlock(lock2);
+		if (lock2) unlock_spinlock(lock2);
 	}
 	else
 	{
 		memcpy(dest, src, size);
 	}
 }
-
-/**
- * Get property structure function.  Copies a structure from an ivar to another
- * variable.  Locks on the address of src.
- */
-void objc_getPropertyStruct(void *dest,
-                            void *src,
-                            ptrdiff_t size,
-                            BOOL atomic,
-                            BOOL strong)
-{
-	if (atomic)
-	{
-		volatile int *lock = lock_for_pointer(src);
-		lock_spinlock(lock);
-		memcpy(dest, src, size);
-		unlock_spinlock(lock);
-	}
-	else
-	{
-		memcpy(dest, src, size);
-	}
-}
-
-/**
- * Set property structure function.  Copes a structure to an ivar.  Locks on
- * dest.
- */
-void objc_setPropertyStruct(void *dest,
-                            void *src,
-                            ptrdiff_t size,
-                            BOOL atomic,
-                            BOOL strong)
-{
-	if (atomic)
-	{
-		volatile int *lock = lock_for_pointer(dest);
-		lock_spinlock(lock);
-		memcpy(dest, src, size);
-		unlock_spinlock(lock);
-	}
-	else
-	{
-		memcpy(dest, src, size);
-	}
-}
-
 
 objc_property_t class_getProperty(Class cls, const char *name)
 {
