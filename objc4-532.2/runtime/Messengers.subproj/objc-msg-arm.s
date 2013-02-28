@@ -44,6 +44,10 @@
 #define THUMB 1
 #endif
 
+#if TARGET_OS_ANDROID
+#undef THUMB
+#endif
+
 .syntax unified	
 	
 #if defined(__DYNAMIC__)
@@ -109,11 +113,11 @@ L ## var ## __non_lazy_ptr:                         ;\
 #endif
 
 
-MI_EXTERN(__class_lookupMethodAndLoadCache3)
+MI_EXTERN(_class_lookupMethodAndLoadCache3)
 MI_EXTERN(_FwdSel)
-MI_EXTERN(___objc_error)
-MI_EXTERN(__objc_forward_handler)
-MI_EXTERN(__objc_forward_stret_handler)
+MI_EXTERN(__objc_error)
+MI_EXTERN(_objc_forward_handler)
+MI_EXTERN(_objc_forward_stret_handler)
 
 #if 0
 // Special section containing a function pointer that dyld will call
@@ -134,21 +138,21 @@ L__objc_notify_images:
 # in the cache for dispatching.  The labels surround the asm code
 # that do cache lookups.  The tables are zero-terminated.
 .data
-.private_extern _objc_entryPoints
+.long _objc_entryPoints
 _objc_entryPoints:
-	.long   __cache_getImp
-	.long   __cache_getMethod
-	.long   _objc_msgSend
-	.long   _objc_msgSend_noarg
-	.long   _objc_msgSend_stret
-	.long   _objc_msgSendSuper
-	.long   _objc_msgSendSuper_stret
-	.long   _objc_msgSendSuper2
-	.long   _objc_msgSendSuper2_stret
+	.long   _cache_getImp
+	.long   _cache_getMethod
+	.long   objc_msgSend
+	.long   objc_msgSend_noarg
+	.long   objc_msgSend_stret
+	.long   objc_msgSendSuper
+	.long   objc_msgSendSuper_stret
+	.long   objc_msgSendSuper2
+	.long   objc_msgSendSuper2_stret
 	.long   0
 
 .data
-.private_extern _objc_exitPoints
+.long _objc_exitPoints
 _objc_exitPoints:
 	.long   LGetImpExit
 	.long   LGetMethodExit
@@ -192,31 +196,33 @@ _objc_exitPoints:
 # Takes: functionName - name of the exported function
 #####################################################################
 
-.macro ENTRY /* name */
+.macro ENTRY name
 	.text
 #ifdef THUMB
 	.thumb
 #endif
 	.align 5
-	.globl    _$0
+	.globl    \name
+	.type     \name, %function
 #ifdef THUMB
 	.thumb_func
 #endif
-_$0:	
-.endmacro
+\name:	
+.endm
 
-.macro STATIC_ENTRY /*name*/
+.macro STATIC_ENTRY name
 	.text
 #ifdef THUMB
 	.thumb
 #endif
 	.align 5
-	.private_extern _$0
+	.globl \name
+	.type  \name, %function
 #ifdef THUMB
 	.thumb_func
 #endif
-_$0:	
-.endmacro
+\name:	
+.endm
 	
 	
 #####################################################################
@@ -229,8 +235,8 @@ _$0:
 # Takes: functionName - name of the exported function
 #####################################################################
 
-.macro END_ENTRY /* name */
-.endmacro
+.macro END_ENTRY name
+.endm
 
 
 #####################################################################
@@ -252,31 +258,31 @@ _$0:
 #
 #####################################################################
 
-.macro CacheLookup /* selReg, classReg, missLabel */
+.macro CacheLookup selReg, classReg, missLabel
 	
-	MOVE	r9, $0, LSR #2          /* index = (sel >> 2) */
-	ldr     a4, [$1, #CACHE]        /* cache = class->cache */
+	MOVE	r9, \selReg, LSR #2     /* index = (sel >> 2) */
+	ldr     a4, [\classReg, #CACHE] /* cache = class->cache */
 	add     a4, a4, #BUCKETS        /* buckets = &cache->buckets */
 
 /* search the cache */
-/* a1=receiver, a2 or a3=sel, r9=index, a4=buckets, $1=method */
+/* a1=receiver, a2 or a3=sel, r9=index, a4=buckets, \classReg=method */
 1:
-	ldr     ip, [a4, #NEGMASK]      /* mask = cache->mask */
-	and     r9, r9, ip              /* index &= mask           */
-	ldr     $1, [a4, r9, LSL #2]    /* method = buckets[index] */
-	teq     $1, #0                  /* if (method == NULL)     */
-	add     r9, r9, #1              /* index++                 */
-	beq     $2                      /*     goto cacheMissLabel */
+	ldr     ip, [a4, #NEGMASK]      	   /* mask = cache->mask */
+	and     r9, r9, ip              	   /* index &= mask           */
+	ldr     \classReg, [a4, r9, LSL #2]    /* method = buckets[index] */
+	teq     \classReg, #0                  /* if (method == NULL)     */
+	add     r9, r9, #1                     /* index++                 */
+	beq     \missLabel                     /*     goto cacheMissLabel */
 
-	ldr     ip, [$1, #METHOD_NAME]  /* load method->method_name        */
-	teq     $0, ip                  /* if (method->method_name != sel) */
-	bne     1b                      /*     retry                       */
+	ldr     ip, [\classReg, #METHOD_NAME]  /* load method->method_name        */
+	teq     \selReg, ip                    /* if (method->method_name != sel) */
+	bne     1b                             /*     retry                       */
 
-/* cache hit, $1 == method triplet address */
-/* Return triplet in $1 and imp in ip      */
-	ldr     ip, [$1, #METHOD_IMP]   /* imp = method->method_imp */
+/* cache hit, \classReg == method triplet address */
+/* Return triplet in \classReg and imp in ip      */
+	ldr     ip, [\classReg, #METHOD_IMP]   /* imp = method->method_imp */
 
-.endmacro
+.endm
 
 
 /********************************************************************
@@ -375,7 +381,7 @@ LGetImpExit:
 # cache miss: go search the method lists
 LMsgSendCacheMiss:
 	ldmfd	sp!, {a4,v1}
-	b	_objc_msgSend_uncached
+	b	objc_msgSend_uncached
 
 LMsgSendNilReceiver:
     mov     a2, #0
@@ -397,7 +403,7 @@ LMsgSendExit:
 					/* receiver already in a1 */
 
 # Do the lookup
-	MI_CALL_EXTERNAL(__class_lookupMethodAndLoadCache3)
+	MI_CALL_EXTERNAL(_class_lookupMethodAndLoadCache3)
 	MOVE    ip, a1
 
 # Prep for forwarding, Pop stack frame and call imp
@@ -428,7 +434,7 @@ LMsgSendExit:
 
 # cache miss: go search the method lists
 LMsgSendNoArgCacheMiss:
-	b	_objc_msgSend_uncached
+	b	objc_msgSend_uncached
 
 LMsgSendNoArgExit:
 	END_ENTRY objc_msgSend_noarg
@@ -469,7 +475,7 @@ LMsgSendNoArgExit:
 # cache miss: go search the method lists
 LMsgSendStretCacheMiss:
 	ldmfd	sp!, {a4,v1}
-	b	_objc_msgSend_stret_uncached
+	b	objc_msgSend_stret_uncached
 	
 LMsgSendStretExit:
 	END_ENTRY objc_msgSend_stret
@@ -487,7 +493,7 @@ LMsgSendStretExit:
 	ldr	a3, [a1, #ISA]		/* class = receiver->isa */
 
 # Do the lookup
-	MI_CALL_EXTERNAL(__class_lookupMethodAndLoadCache3)
+	MI_CALL_EXTERNAL(_class_lookupMethodAndLoadCache3)
 	MOVE    ip, a1
 
 # Prep for forwarding, pop stack frame and call imp
@@ -525,7 +531,7 @@ LMsgSendStretExit:
 # cache miss: go search the method lists
 LMsgSendSuperCacheMiss:
 	ldmfd   sp!, {a4,v1}
-	b	_objc_msgSendSuper_uncached
+	b	objc_msgSendSuper_uncached
 
 LMsgSendSuperExit:
 	END_ENTRY objc_msgSendSuper
@@ -543,7 +549,7 @@ LMsgSendSuperExit:
 	ldr     a1, [a1, #RECEIVER]	/* receiver = super->receiver */
 
 # Do the lookup
-	MI_CALL_EXTERNAL(__class_lookupMethodAndLoadCache3)
+	MI_CALL_EXTERNAL(_class_lookupMethodAndLoadCache3)
 	MOVE    ip, a1
 
 # Prep for forwarding, pop stack frame and call imp
@@ -575,7 +581,7 @@ LMsgSendSuperExit:
 # cache miss: go search the method lists
 LMsgSendSuper2CacheMiss:
 	ldmfd   sp!, {a4,v1}
-	b	_objc_msgSendSuper2_uncached
+	b	objc_msgSendSuper2_uncached
 
 LMsgSendSuper2Exit:
 	END_ENTRY objc_msgSendSuper2
@@ -594,7 +600,7 @@ LMsgSendSuper2Exit:
 	ldr     a1, [a1, #RECEIVER]	/* receiver = super->receiver */
 
 # Do the lookup
-	MI_CALL_EXTERNAL(__class_lookupMethodAndLoadCache3)
+	MI_CALL_EXTERNAL(_class_lookupMethodAndLoadCache3)
 	MOVE    ip, a1
 
 # Prep for forwarding, pop stack frame and call imp
@@ -642,7 +648,7 @@ LMsgSendSuper2Exit:
 # cache miss: go search the method lists
 LMsgSendSuperStretCacheMiss:
 	ldmfd   sp!, {a4,v1}
-	b	_objc_msgSendSuper_stret_uncached
+	b	objc_msgSendSuper_stret_uncached
 
 LMsgSendSuperStretExit:
 	END_ENTRY objc_msgSendSuper_stret
@@ -661,7 +667,7 @@ LMsgSendSuperStretExit:
 	ldr     a1, [a1, #RECEIVER]	/* receiver = super->receiver */
 
 # Do the lookup
-	MI_CALL_EXTERNAL(__class_lookupMethodAndLoadCache3)
+	MI_CALL_EXTERNAL(_class_lookupMethodAndLoadCache3)
 	MOVE    ip, a1
 
 # Prep for forwarding, pop stack frame and call imp
@@ -695,7 +701,7 @@ LMsgSendSuperStretExit:
 # cache miss: go search the method lists
 LMsgSendSuper2StretCacheMiss:
 	ldmfd   sp!, {a4,v1}
-	b	_objc_msgSendSuper2_stret_uncached
+	b	objc_msgSendSuper2_stret_uncached
 
 LMsgSendSuper2StretExit:
 	END_ENTRY objc_msgSendSuper2_stret
@@ -715,7 +721,7 @@ LMsgSendSuper2StretExit:
 	ldr     a1, [a1, #RECEIVER]	/* receiver = super->receiver */
 
 # Do the lookup
-	MI_CALL_EXTERNAL(__class_lookupMethodAndLoadCache3)
+	MI_CALL_EXTERNAL(_class_lookupMethodAndLoadCache3)
 	MOVE    ip, a1
 
 # Prep for forwarding, pop stack frame and call imp
@@ -763,16 +769,16 @@ LMsgSendSuper2StretExit:
  ********************************************************************/
 
 .data
-.private_extern _FwdSel
+.long _FwdSel
 _FwdSel:
 	.long 0
 
-.private_extern __objc_forward_handler
-__objc_forward_handler:
+.long _objc_forward_handler
+_objc_forward_handler:
 	.long 0
 
-.private_extern __objc_forward_stret_handler
-__objc_forward_stret_handler:
+.long _objc_forward_stret_handler
+_objc_forward_stret_handler:
 	.long 0
 
 
@@ -782,8 +788,8 @@ __objc_forward_stret_handler:
 	// THIS IS NOT A CALLABLE C FUNCTION
 	// Out-of-band condition register is NE for stret, EQ otherwise.
 
-	bne	__objc_msgForward_stret
-	b	__objc_msgForward
+	bne	_objc_msgForward_stret
+	b	_objc_msgForward
 	
 	END_ENTRY _objc_msgForward_internal
 	
@@ -792,7 +798,7 @@ __objc_forward_stret_handler:
 	// Non-stret version
 
 # check for user-installed forwarding handler
-	MI_GET_ADDRESS(ip, __objc_forward_handler)
+	MI_GET_ADDRESS(ip, _objc_forward_handler)
 	ldr	ip, [ip]
 	teq	ip, #0
 	it	ne
@@ -816,7 +822,7 @@ __objc_forward_stret_handler:
 	str     lr, [sp, #-(2*4)]!       @ save lr and align stack
 
 # send it
-	bl      _objc_msgSend
+	bl      objc_msgSend
 
 # pop stack frame and return
 	ldr	lr, [sp]
@@ -830,7 +836,7 @@ __objc_forward_stret_handler:
 	// Struct-return version
 
 # check for user-installed forwarding handler
-	MI_GET_ADDRESS(ip, __objc_forward_stret_handler)
+	MI_GET_ADDRESS(ip, _objc_forward_stret_handler)
 	ldr	ip, [ip]
 	teq	ip, #0
 	it	ne
@@ -854,7 +860,7 @@ __objc_forward_stret_handler:
 	str     lr, [sp, #-(2*4)]!       @ save lr and align stack
 
 # send it
-	bl      _objc_msgSend
+	bl      objc_msgSend
 
 # pop stack frame and return
 	ldr	lr, [sp]
@@ -867,25 +873,25 @@ LMsgForwardError:
 	# currently a1=self, a2=forward::, a3 = original sel, a4 = marg_list
 	# call __objc_error(self, format, original sel)
 	add     a2, pc, #4     @ pc bias is 8 bytes
-	MI_CALL_EXTERNAL(___objc_error)
+	MI_CALL_EXTERNAL(__objc_error)
 	.ascii "Does not recognize selector %s\0"
 
 
-	ENTRY objc_msgSend_debug
-	b	_objc_msgSend
-	END_ENTRY objc_msgSend_debug
+	ENTRY objc_msgSend_fixup
+	b	objc_msgSend
+	END_ENTRY objc_msgSend_fixup
 
-	ENTRY objc_msgSendSuper2_debug
-	b	_objc_msgSendSuper2
-	END_ENTRY objc_msgSendSuper2_debug
+	ENTRY objc_msgSendSuper2_fixup
+	b	objc_msgSendSuper2
+	END_ENTRY objc_msgSendSuper2_fixup
 
-	ENTRY objc_msgSend_stret_debug
-	b	_objc_msgSend_stret
-	END_ENTRY objc_msgSend_stret_debug
+	ENTRY objc_msgSend_stret_fixup
+	b	objc_msgSend_stret
+	END_ENTRY objc_msgSend_stret_fixup
 
-	ENTRY objc_msgSendSuper2_stret_debug
-	b	_objc_msgSendSuper2_stret
-	END_ENTRY objc_msgSendSuper2_stret_debug
+	ENTRY objc_msgSendSuper2_stret_fixup
+	b	objc_msgSendSuper2_stret
+	END_ENTRY objc_msgSendSuper2_stret_fixup
 
 
 	ENTRY method_invoke

@@ -513,7 +513,9 @@ void objc_exception_throw(id obj)
                          exc, obj, object_getClassName(obj));
         void* callstack[500];
         int frameCount = backtrace(callstack, 500);
+#ifndef APPORTABLE // TODO: FIXME!
         backtrace_symbols_fd(callstack, frameCount, fileno(stderr));
+#endif
     }
     
     OBJC_RUNTIME_OBJC_EXCEPTION_THROW(obj);  // dtrace probe to log throw activity

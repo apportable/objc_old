@@ -205,6 +205,121 @@ static inline int ARRSpinLockTry(ARRSpinLock *l)
 #   define OBJC_RUNTIME_OBJC_EXCEPTION_RETHROW() do {} while(0)  
 #   define OBJC_RUNTIME_OBJC_EXCEPTION_THROW(arg0) do {} while(0)
 
+#elif TARGET_OS_ANDROID
+
+
+#   ifndef __STDC_LIMIT_MACROS
+#       define __STDC_LIMIT_MACROS
+#   endif
+
+#   include <stdio.h>
+#   include <stdlib.h>
+#   include <stdint.h>
+#   include <stdarg.h>
+#   include <string.h>
+#   include <ctype.h>
+#   include <errno.h>
+#   include <dlfcn.h>
+#   include <fcntl.h>
+#   include <assert.h>
+#   include <limits.h>
+#   include <syslog.h>
+#   include <unistd.h>
+#   include <pthread.h>
+#   include <crt_externs.h>
+#   include <AssertMacros.h>
+#   undef check
+#   include <AvailabilityMacros.h>
+#   include <TargetConditionals.h>
+#   include <sys/mman.h>
+#   include <sys/time.h>
+#   include <sys/stat.h>
+#   include <sys/param.h>
+#   include <libkern/OSAtomic.h>
+#   include <libkern/OSCacheControl.h>
+
+#   define OBJC_RUNTIME_OBJC_EXCEPTION_RETHROW() do {} while(0)  
+#   define OBJC_RUNTIME_OBJC_EXCEPTION_THROW(arg0) do {} while(0)
+
+#if defined(__i386__) || defined(__x86_64__)
+
+// Inlined spinlock.
+// Not for arm on iOS because it hurts uniprocessor performance.
+
+#define ARR_SPINLOCK_INIT 0
+// XXX -- Careful: OSSpinLock isn't volatile, but should be
+typedef volatile int ARRSpinLock;
+__attribute__((always_inline))
+static inline void ARRSpinLockLock(ARRSpinLock *l)
+{
+    unsigned y;
+again:
+    if (__builtin_expect(__sync_lock_test_and_set(l, 1), 0) == 0) {
+        return;
+    }
+    for (y = 1000; y; y--) {
+#if defined(__i386__) || defined(__x86_64__)
+        asm("pause");
+#endif
+        if (*l == 0) goto again;
+    }
+    thread_switch(THREAD_NULL, SWITCH_OPTION_DEPRESS, 1);
+    goto again;
+}
+__attribute__((always_inline))
+static inline void ARRSpinLockUnlock(ARRSpinLock *l)
+{
+    __sync_lock_release(l);
+}
+__attribute__((always_inline))
+static inline int ARRSpinLockTry(ARRSpinLock *l)
+{
+    return __sync_bool_compare_and_swap(l, 0, 1);
+}
+
+#define OSSpinLock ARRSpinLock
+#define OSSpinLockTry(l) ARRSpinLockTry(l)
+#define OSSpinLockLock(l) ARRSpinLockLock(l)
+#define OSSpinLockUnlock(l) ARRSpinLockUnlock(l)
+#undef OS_SPINLOCK_INIT
+#define OS_SPINLOCK_INIT ARR_SPINLOCK_INIT 
+
+#endif
+
+#include <elf.h>
+
+#define CRSetCrashLogMessage(msg) ""
+#define CRGetCrashLogMessage() ""
+#define CRSetCrashLogMessage2(msg) ""
+
+    // getsectiondata() and getsegmentdata() are unavailable
+__BEGIN_DECLS
+#   define getsectiondata(m, s, n, c) objc_getsectiondata(m, #s, n, c)
+#   define getsegmentdata(m, s, c) objc_getsegmentdata(m, #s, c)
+extern uint8_t *objc_getsectiondata(const Elf32_Ehdr *eh, const char *segname, const char *sectname, unsigned long *outSize);
+extern uint8_t * objc_getsegmentdata(const Elf32_Ehdr *eh, const char *segname, unsigned long *outSize);
+__END_DECLS
+
+#   if __cplusplus
+#       include <vector>
+#       include <algorithm>
+#       include <functional>
+        using namespace std;
+#   endif
+
+#   define PRIVATE_EXTERN __attribute__((visibility("hidden")))
+#   undef __private_extern__
+#   define __private_extern__ use_PRIVATE_EXTERN_instead
+#   undef private_extern
+#   define private_extern use_PRIVATE_EXTERN_instead
+
+/* Use this for functions that are intended to be breakpoint hooks.
+   If you do not, the compiler may optimize them away.
+   BREAKPOINT_FUNCTION( void stop_on_error(void) ); */
+#   define BREAKPOINT_FUNCTION(prototype)                            \
+    OBJC_EXTERN __attribute__((noinline, visibility("hidden")))      \
+    prototype { asm(""); }
+
 #else
 #   error unknown OS
 #endif
@@ -220,7 +335,7 @@ extern void _objc_fatal(const char *fmt, ...) __attribute__((noreturn, format (p
 #define INIT_ONCE_PTR(var, create, delete)                              \
     do {                                                                \
         if (var) break;                                                 \
-        typeof(var) v = create;                                         \
+        __typeof(var) v = create;                                         \
         while (!var) {                                                  \
             if (OSAtomicCompareAndSwapPtrBarrier(0, (void*)v, (void**)&var)){ \
                 goto done;                                              \
@@ -233,7 +348,7 @@ extern void _objc_fatal(const char *fmt, ...) __attribute__((noreturn, format (p
 #define INIT_ONCE_32(var, create, delete)                               \
     do {                                                                \
         if (var) break;                                                 \
-        typeof(var) v = create;                                         \
+        __typeof(var) v = create;                                         \
         while (!var) {                                                  \
             if (OSAtomicCompareAndSwap32Barrier(0, v, (volatile int32_t *)&var)) { \
                 goto done;                                              \
@@ -879,6 +994,261 @@ typedef struct section_64 sectionType;
 /* Secure /tmp usage */
 extern int secure_open(const char *filename, int flags, uid_t euid);
 
+
+#elif TARGET_OS_ANDROID
+
+#include <stdlib.h>
+#include <malloc.h>
+
+typedef void * malloc_zone_t;
+static __inline size_t malloc_good_size(size_t sz) { return sz; }
+static __inline malloc_zone_t *malloc_default_zone(void) { return (malloc_zone_t *)0; }
+static __inline malloc_zone_t *_objc_internal_zone(void) { return (malloc_zone_t *)0; }
+static __inline void *malloc_zone_malloc(malloc_zone_t z, size_t size) { return malloc(size); }
+static __inline void *malloc_zone_calloc(malloc_zone_t z, size_t size, size_t count) { return calloc(size, count); }
+static __inline void *malloc_zone_realloc(malloc_zone_t z, void *p, size_t size) { return realloc(p, size); }
+static __inline void malloc_zone_free(malloc_zone_t z, void *p) { free(p); }
+static __inline void *malloc_zone_memalign(malloc_zone_t z, size_t alignment, size_t size) { return memalign(alignment, size); }
+static __inline malloc_zone_t malloc_zone_from_ptr(const void *p) { return (malloc_zone_t)0; }
+static __inline size_t malloc_size(const void *p) { return malloc_usable_size((void*)p); }
+
+//Assert.h missing
+
+// #define require_action_string(cond, dest, act, msg) do { if (!(cond)) { { act; } goto dest; } } while (0)
+// #define require_noerr_string(err, dest, msg) do { if (err) goto dest; } while (0)
+// #define require_string(cond, dest, msg) do { if (!(cond)) goto dest; } while (0)
+// #endif
+
+// malloc_zone_malloc
+// malloc_zone_calloc
+// malloc_zone_realloc
+// malloc_zone_free
+// malloc_zone_batch_malloc
+// malloc_default_zone
+// malloc_good_size
+
+typedef pthread_t objc_thread_t;
+
+static __inline int thread_equal(objc_thread_t t1, objc_thread_t t2) { 
+    return pthread_equal(t1, t2); 
+}
+static __inline objc_thread_t thread_self(void) { 
+    return pthread_self(); 
+}
+
+typedef pthread_key_t tls_key_t;
+
+static inline tls_key_t tls_create(void (*dtor)(void*)) { 
+    tls_key_t k;
+    pthread_key_create(&k, dtor); 
+    return k;
+}
+static inline void *tls_get(tls_key_t k) { 
+    return pthread_getspecific(k); 
+}
+static inline void tls_set(tls_key_t k, void *value) { 
+    pthread_setspecific(k, value); 
+}
+
+static inline void *tls_get_direct(tls_key_t k) 
+{ 
+    return pthread_getspecific(k);
+}
+
+static inline void tls_set_direct(tls_key_t k, void *value) 
+{ 
+    pthread_setspecific(k, value);
+}
+
+
+typedef pthread_mutex_t mutex_t;
+#define MUTEX_INITIALIZER PTHREAD_MUTEX_INITIALIZER;
+
+extern int DebuggerMode;
+extern void gdb_objc_debuggerModeFailure(void);
+extern BOOL isManagedDuringDebugger(void *lock);
+extern BOOL isLockedDuringDebugger(void *lock);
+
+static inline int _mutex_lock_nodebug(mutex_t *m) { 
+    if (DebuggerMode  &&  isManagedDuringDebugger(m)) {
+        if (! isLockedDuringDebugger(m)) {
+            gdb_objc_debuggerModeFailure();
+        }
+        return 0;
+    }
+    return pthread_mutex_lock(m); 
+}
+static inline bool _mutex_try_lock_nodebug(mutex_t *m) { 
+    if (DebuggerMode  &&  isManagedDuringDebugger(m)) {
+        if (! isLockedDuringDebugger(m)) {
+            gdb_objc_debuggerModeFailure();
+        }
+        return true;
+    }
+    return !pthread_mutex_trylock(m); 
+}
+static inline int _mutex_unlock_nodebug(mutex_t *m) { 
+    if (DebuggerMode  &&  isManagedDuringDebugger(m)) {
+        return 0;
+    }
+    return pthread_mutex_unlock(m); 
+}
+
+
+typedef struct { 
+    pthread_mutex_t *mutex; 
+} recursive_mutex_t;
+#define RECURSIVE_MUTEX_INITIALIZER {0};
+#define RECURSIVE_MUTEX_NOT_LOCKED EPERM
+extern void recursive_mutex_init(recursive_mutex_t *m);
+
+static inline int _recursive_mutex_lock_nodebug(recursive_mutex_t *m) { 
+    assert(m->mutex);
+    if (DebuggerMode  &&  isManagedDuringDebugger(m)) {
+        if (! isLockedDuringDebugger((mutex_t *)m)) {
+            gdb_objc_debuggerModeFailure();
+        }
+        return 0;
+    }
+    return pthread_mutex_lock(m->mutex); 
+}
+static inline bool _recursive_mutex_try_lock_nodebug(recursive_mutex_t *m) { 
+    assert(m->mutex);
+    if (DebuggerMode  &&  isManagedDuringDebugger(m)) {
+        if (! isLockedDuringDebugger((mutex_t *)m)) {
+            gdb_objc_debuggerModeFailure();
+        }
+        return true;
+    }
+    return !pthread_mutex_trylock(m->mutex); 
+}
+static inline int _recursive_mutex_unlock_nodebug(recursive_mutex_t *m) { 
+    assert(m->mutex);
+    if (DebuggerMode  &&  isManagedDuringDebugger(m)) {
+        return 0;
+    }
+    return pthread_mutex_unlock(m->mutex); 
+}
+
+
+typedef struct {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+} monitor_t;
+#define MONITOR_INITIALIZER { PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER }
+#define MONITOR_NOT_ENTERED EPERM
+
+static inline int monitor_init(monitor_t *c) {
+    int err = pthread_mutex_init(&c->mutex, NULL);
+    if (err) return err;
+    err = pthread_cond_init(&c->cond, NULL);
+    if (err) {
+        pthread_mutex_destroy(&c->mutex);
+        return err;
+    }
+    return 0;
+}
+static inline int _monitor_enter_nodebug(monitor_t *c) {
+    assert(!isManagedDuringDebugger(c));
+    return pthread_mutex_lock(&c->mutex);
+}
+static inline int _monitor_exit_nodebug(monitor_t *c) {
+    return pthread_mutex_unlock(&c->mutex);
+}
+static inline int _monitor_wait_nodebug(monitor_t *c) { 
+    return pthread_cond_wait(&c->cond, &c->mutex);
+}
+static inline int monitor_notify(monitor_t *c) { 
+    return pthread_cond_signal(&c->cond);
+}
+static inline int monitor_notifyAll(monitor_t *c) { 
+    return pthread_cond_broadcast(&c->cond);
+}
+
+typedef struct {
+    pthread_rwlock_t rwl;
+} rwlock_t;
+
+extern BOOL isReadingDuringDebugger(rwlock_t *lock);
+extern BOOL isWritingDuringDebugger(rwlock_t *lock);
+
+static inline void rwlock_init(rwlock_t *l)
+{
+    int err __unused = pthread_rwlock_init(&l->rwl, NULL);
+    assert(err == 0);
+}
+
+static inline void _rwlock_read_nodebug(rwlock_t *l)
+{
+    if (DebuggerMode  &&  isManagedDuringDebugger(l)) {
+        if (! isReadingDuringDebugger(l)) {
+            gdb_objc_debuggerModeFailure();
+        }
+        return;
+    }
+    int err __unused = pthread_rwlock_rdlock(&l->rwl);
+    assert(err == 0);
+}
+
+static inline void _rwlock_unlock_read_nodebug(rwlock_t *l)
+{
+    if (DebuggerMode  &&  isManagedDuringDebugger(l)) {
+        return;
+    }
+    int err __unused = pthread_rwlock_unlock(&l->rwl);
+    assert(err == 0);
+}
+
+
+static inline bool _rwlock_try_read_nodebug(rwlock_t *l)
+{
+    if (DebuggerMode  &&  isManagedDuringDebugger(l)) {
+        if (! isReadingDuringDebugger(l)) {
+            gdb_objc_debuggerModeFailure();
+        }
+        return true;
+    }
+    int err = pthread_rwlock_tryrdlock(&l->rwl);
+    assert(err == 0  ||  err == EBUSY);
+    return (err == 0);
+}
+
+
+static inline void _rwlock_write_nodebug(rwlock_t *l)
+{
+    if (DebuggerMode  &&  isManagedDuringDebugger(l)) {
+        if (! isWritingDuringDebugger(l)) {
+            gdb_objc_debuggerModeFailure();
+        }
+        return;
+    }
+    int err __unused = pthread_rwlock_wrlock(&l->rwl);
+    assert(err == 0);
+}
+
+static inline void _rwlock_unlock_write_nodebug(rwlock_t *l)
+{
+    if (DebuggerMode  &&  isManagedDuringDebugger(l)) {
+        return;
+    }
+    int err __unused = pthread_rwlock_unlock(&l->rwl);
+    assert(err == 0);
+}
+
+static inline bool _rwlock_try_write_nodebug(rwlock_t *l)
+{
+    if (DebuggerMode  &&  isManagedDuringDebugger(l)) {
+        if (! isWritingDuringDebugger(l)) {
+            gdb_objc_debuggerModeFailure();
+        }
+        return true;
+    }
+    int err = pthread_rwlock_trywrlock(&l->rwl);
+    assert(err == 0  ||  err == EBUSY);
+    return (err == 0);
+}
+
+#define headerType Elf32_Ehdr
 
 #else
 

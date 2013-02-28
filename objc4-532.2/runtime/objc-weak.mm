@@ -303,7 +303,7 @@ static void remove_referrer_no_lock(weak_referrer_array_t *list, id *old_referre
         if (index == list->num_allocated)
             index = 0;
         if (index == start_index || hash_displacement > list->max_hash_displacement) {
-            malloc_printf("attempted to remove unregistered weak referrer %p\n", old_referrer);
+            DEBUG_LOG("attempted to remove unregistered weak referrer %p\n", old_referrer);
             return;
         }
     }
@@ -332,7 +332,7 @@ static void weak_entry_insert_no_lock(weak_table_t *weak_table, weak_entry_t *ne
         }
         index++; if (index == table_size) index = 0;
     } while (index != hash_index);
-    malloc_printf("no room for new entry in auto weak ref table!\n");
+    DEBUG_LOG("no room for new entry in auto weak ref table!\n");
 }
 
 

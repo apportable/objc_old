@@ -41,11 +41,17 @@
 - (id)mutableCopyWithZone:(void *)zone;
 @end
 
-
+#if APPORTABLE
+typedef OSSpinLock spin_lock_t;
+#define _spin_lock(l) (OSSpinLockLock(l))
+#define _spin_lock_try(l) ((int)OSSpinLockTry(l))
+#define _spin_unlock(l) (OSSpinLockUnlock(l))
+#else
 typedef uintptr_t spin_lock_t;
 OBJC_EXTERN void _spin_lock(spin_lock_t *lockp);
 OBJC_EXTERN int  _spin_lock_try(spin_lock_t *lockp);
 OBJC_EXTERN void _spin_unlock(spin_lock_t *lockp);
+#endif
 
 /* need to consider cache line contention - space locks out XXX */
 

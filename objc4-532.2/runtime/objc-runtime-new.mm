@@ -32,7 +32,9 @@
 #include "objc-runtime-new.h"
 #include "objc-file.h"
 #include <objc/message.h>
+#if TARGET_OS_MACH
 #include <mach/shared_region.h>
+#endif
 
 #define newcls(cls) ((class_t *)cls)
 #define newmethod(meth) ((method_t *)meth)
@@ -292,12 +294,12 @@ BOOL isWritingDuringDebugger(rwlock_t *lock)
 
 // hack to avoid conflicts with compiler's internal declaration
 asm("\n .data"
-    "\n .globl __objc_empty_vtable "
-    "\n __objc_empty_vtable:"
+    "\n .globl _objc_empty_vtable "
+    "\n _objc_empty_vtable:"
 #if __LP64__
-    X128("\n .quad _objc_msgSend")
+    X128("\n .quad objc_msgSend")
 #else
-    X128("\n .long _objc_msgSend")
+    X128("\n .long objc_msgSend")
 #endif
     );
 
@@ -1075,9 +1077,11 @@ static void addUnattachedCategoryForClass(category_t *cat, class_t *cls,
                                           header_info *catHeader)
 {
     rwlock_assert_writing(&runtimeLock);
-
+#ifdef TARGET_OS_ANDROID // this is probably not exactly correct
+    BOOL catFromBundle = YES;
+#else
     BOOL catFromBundle = (catHeader->mhdr->filetype == MH_BUNDLE) ? YES: NO;
-
+#endif
     // DO NOT use cat->cls! cls may be cat->cls->isa instead
     NXMapTable *cats = unattachedCategories();
     category_list *list;
@@ -2842,6 +2846,11 @@ void flush_caches(Class cls_gen, BOOL flush_meta)
     rwlock_unlock_write(&runtimeLock);
 }
 
+#if TARGET_OS_ANDROID
+
+#warning FIXME!
+
+#elif TARGET_OS_MAC
 
 /***********************************************************************
 * map_images
@@ -3235,6 +3244,8 @@ void _read_images(header_info **hList, uint32_t hCount)
 #undef EACH_HEADER
 }
 
+#endif
+
 
 /***********************************************************************
 * prepare_load_methods
@@ -3280,6 +3291,11 @@ void prepare_load_methods(header_info *hi)
     }
 }
 
+#if TARGET_OS_ANDROID
+
+#warning FIXME!
+
+#elif TARGET_OS_MAC
 
 /***********************************************************************
 * _unload_image
@@ -3341,6 +3357,7 @@ void _unload_image(header_info *hi)
     // fixme DebugUnload
 }
 
+#endif
 
 /***********************************************************************
 * method_getDescription
@@ -6808,6 +6825,7 @@ _objc_fixupMessageRef(id obj, struct objc_super2 *supr, message_ref_t *msg)
         imp = (IMP)&_objc_ignored_method;
     }
 #if SUPPORT_VTABLE
+    #error
     else if (msg->imp == (IMP)&objc_msgSend_fixup  &&  
         (vtableIndex = vtable_getIndex(msg->sel)) >= 0) 
     {

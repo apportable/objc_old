@@ -30,7 +30,20 @@
 
 #if __OBJC2__
 
+#ifdef BUILDING_OBJC_RUNTIME
+
+#ifndef __OSX_AVAILABLE_STARTING
+#define __OSX_AVAILABLE_STARTING(x,y)
+#endif
+
+#ifndef DEPRECATED_IN_MAC_OS_X_VERSION_10_5_AND_LATER
+#define DEPRECATED_IN_MAC_OS_X_VERSION_10_5_AND_LATER
+#endif
+    
+typedef unsigned int NSUInteger;
+#else
 #include <Foundation/NSObject.h>
+#endif
 
 // All methods of class Protocol are unavailable. 
 // Use the functions in objc/runtime.h instead.

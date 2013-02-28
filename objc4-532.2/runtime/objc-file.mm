@@ -25,8 +25,11 @@
 
 #include "objc-private.h"
 #include "objc-file.h"
+#if TARGET_OS_ANDROID
 
-#if TARGET_IPHONE_SIMULATOR
+#warning FIXME!
+
+#elif TARGET_IPHONE_SIMULATOR
 // getsectiondata() not yet available
 
 // 1. Find segment with file offset == 0 and file size != 0. This segment's
@@ -103,6 +106,7 @@ objc_getsegmentdata(const struct mach_header *mh, const char *segname, unsigned 
 // TARGET_IPHONE_SIMULATOR
 #endif
 
+#if !TARGET_OS_ANDROID
 #define GETSECT(name, type, sectname)                                   \
     type *name(const header_info *hi, size_t *outCount)  \
     {                                                                   \
@@ -175,5 +179,59 @@ _hasObjcContents(const header_info *hi)
 
     return NO;
 }
+#elif TARGET_OS_ANDROID
+
+extern SEL *_getObjc2SelectorRefs(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+extern message_ref_t *_getObjc2MessageRefs(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+extern class_t **_getObjc2ClassRefs(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+extern class_t **_getObjc2SuperRefs(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+extern classref_t *_getObjc2ClassList(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+extern classref_t *_getObjc2NonlazyClassList(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+extern category_t **_getObjc2CategoryList(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+extern category_t **_getObjc2NonlazyCategoryList(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+extern protocol_t **_getObjc2ProtocolList(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+extern protocol_t **_getObjc2ProtocolRefs(const header_info *hi, size_t *count)
+{
+    return NULL; // FIXME!
+}
+
+
+#endif
 
 #endif

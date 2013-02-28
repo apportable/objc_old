@@ -1116,8 +1116,7 @@ void _free_internal(void *ptr)
 
 size_t _malloc_size_internal(void *ptr)
 {
-    malloc_zone_t *zone = _objc_internal_zone();
-    return zone->size(zone, ptr);
+    return malloc_size(ptr);
 }
 
 Class _calloc_class(size_t size)
@@ -1267,11 +1266,17 @@ _class_createInstancesFromZone(Class cls, size_t extraBytes, void *zone,
 #endif
     {
         unsigned i;
-        num_allocated = 
-            malloc_zone_batch_malloc((malloc_zone_t *)(zone ? zone : malloc_default_zone()), 
-                                     size, (void**)results, num_requested);
-        for (i = 0; i < num_allocated; i++) {
-            bzero(results[i], size);
+        for (i = 0; i < num_requested; i++)
+        {
+            results[i] = (id)calloc(1, size);
+            if (results[i] != NULL)
+            {
+                num_allocated = i;
+            }
+            else
+            {
+                break;
+            }
         }
     }
 
@@ -1302,7 +1307,7 @@ _class_createInstancesFromZone(Class cls, size_t extraBytes, void *zone,
 void 
 inform_duplicate(const char *name, Class oldCls, Class cls)
 {
-#if TARGET_OS_WIN32
+#if TARGET_OS_WIN32 || TARGET_OS_ANDROID
     _objc_inform ("Class %s is implemented in two different images.", name);
 #else
     const header_info *oldHeader = _headerForClass(oldCls);

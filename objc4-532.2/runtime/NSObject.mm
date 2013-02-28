@@ -36,7 +36,9 @@
 #include <stdbool.h>
 #include <mach/mach.h>
 #include <mach-o/dyld.h>
+#if !TARGET_OS_ANDROID
 #include <mach-o/nlist.h>
+#endif
 #include <sys/types.h>
 #include <sys/mman.h>
 #include <libkern/OSAtomic.h>
@@ -486,7 +488,11 @@ class AutoreleasePoolPage
 {
 
 #define POOL_SENTINEL 0
+#if TARGET_OS_ANDROID
+    static pthread_key_t key;
+#else
     static pthread_key_t const key = AUTORELEASE_POOL_KEY;
+#endif
     static uint8_t const SCRIBBLE = 0xA3;  // 0xA3A3A3A3 after releasing
     static size_t const SIZE = 
 #if PROTECT_AUTORELEASEPOOL
@@ -820,9 +826,14 @@ public:
 
     static void init()
     {
+#if TARGET_OS_ANDROID
+        int r __unused = pthread_key_create(&AutoreleasePoolPage::key, AutoreleasePoolPage::tls_dealloc);
+        assert(r == 0);
+#else
         int r __unused = pthread_key_init_np(AutoreleasePoolPage::key, 
                                              AutoreleasePoolPage::tls_dealloc);
         assert(r == 0);
+#endif
     }
 
     void print() 
@@ -877,7 +888,7 @@ public:
             _objc_inform("POOL HIGHWATER: new high water mark of %u "
                          "pending autoreleases for thread %p:", 
                          mark, pthread_self());
-            
+#ifndef APPORTABLE // TODO: FIXME!
             void *stack[128];
             int count = backtrace(stack, sizeof(stack)/sizeof(stack[0]));
             char **sym = backtrace_symbols(stack, count);
@@ -885,11 +896,15 @@ public:
                 _objc_inform("POOL HIGHWATER:     %s", sym[i]);
             }
             free(sym);
+#endif
         }
     }
-
 #undef POOL_SENTINEL
 };
+
+#if TARGET_OS_ANDROID
+pthread_key_t AutoreleasePoolPage::key = pthread_key_t();
+#endif
 
 // anonymous namespace
 };

@@ -28,7 +28,7 @@
 
 #include "objc-private.h"
 
-#if !defined(NDEBUG)  &&  !TARGET_OS_WIN32
+#if !defined(NDEBUG)  &&  !TARGET_OS_WIN32 && !TARGET_OS_ANDROID
 
 /***********************************************************************
 * Recording - per-thread list of mutexes and monitors held

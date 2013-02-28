@@ -29,7 +29,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mach-o/dyld.h>
+
+#if !TARGET_OS_ANDROID
 #include <mach-o/ldsyms.h>
+#endif
+
+@interface NSObject {
+    Class isa;
+}
+@end
 
 #include "Protocol.h"
 #include "objc-private.h"

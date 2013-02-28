@@ -83,6 +83,7 @@
 #   define SUPPORT_FIXUP 0
 #else
 #   define SUPPORT_FIXUP 1
+ #error
 #endif
 
 // Define SUPPORT_VTABLE=1 to enable vtable dispatch for OBJC2.
@@ -91,6 +92,7 @@
 #   define SUPPORT_VTABLE 0
 #else
 #   define SUPPORT_VTABLE 1
+ #error
 #endif
 
 // Define SUPPORT_IGNORED_SELECTOR_CONSTANT to remap GC-ignored selectors.
@@ -109,7 +111,7 @@
 
 // Define SUPPORT_ZEROCOST_EXCEPTIONS to use "zero-cost" exceptions for OBJC2.
 // Be sure to edit objc-exception.h as well (objc_add/removeExceptionHandler)
-#if !__OBJC2__  ||  defined(__arm__)
+#if !__OBJC2__  ||  (defined(__arm__) && !TARGET_OS_ANDROID)
 #   define SUPPORT_ZEROCOST_EXCEPTIONS 0
 #else
 #   define SUPPORT_ZEROCOST_EXCEPTIONS 1
@@ -125,7 +127,7 @@
 #endif
 
 // Define SUPPORT_RETURN_AUTORELEASE to optimize autoreleased return values
-#if !__OBJC2__  ||  TARGET_OS_WIN32
+#if !__OBJC2__  ||  TARGET_OS_WIN32 || TARGET_OS_ANDROID
 #   define SUPPORT_RETURN_AUTORELEASE 0
 #else
 #   define SUPPORT_RETURN_AUTORELEASE 1

@@ -109,7 +109,10 @@ header_info *FirstHeader = 0;  // NULL means empty list
 header_info *LastHeader  = 0;  // NULL means invalid; recompute it
 int HeaderCount = 0;
 
-
+id 
+look_up_class(const char *name, 
+              BOOL includeUnconnected __attribute__((unused)), 
+              BOOL includeClassHandler __attribute__((unused)));
 
 /***********************************************************************
 * objc_getClass.  Return the id of the named class.  If the class does
@@ -608,6 +611,9 @@ const char *class_getImageName(Class cls)
 	} else 
 		free(szFileName);
     return NULL;
+#elif TARGET_OS_ANDROID
+    #warning FIXME?
+    return "";
 #else
     return dyld_image_path_containing_address(cls);
 #endif

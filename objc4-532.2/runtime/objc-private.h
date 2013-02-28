@@ -308,7 +308,7 @@ extern mutex_t methodListLock;
 extern int startDebuggerMode(void);
 extern void endDebuggerMode(void);
 
-#if defined(NDEBUG)  ||  TARGET_OS_WIN32
+#if defined(NDEBUG)  ||  TARGET_OS_WIN32 || TARGET_OS_ANDROID
 
 #define mutex_lock(m)             _mutex_lock_nodebug(m)
 #define mutex_try_lock(m)         _mutex_try_lock_nodebug(m)
@@ -684,6 +684,8 @@ extern void layout_bitmap_print(layout_bitmap bits);
 
 
 // fixme runtime
+#ifdef TARGET_OS_MAC
+
 extern id look_up_class(const char *aClassName, BOOL includeUnconnected, BOOL includeClassHandler);
 extern const char *map_images(enum dyld_image_states state, uint32_t infoCount, const struct dyld_image_info infoList[]);
 extern const char *map_images_nolock(enum dyld_image_states state, uint32_t infoCount, const struct dyld_image_info infoList[]);
@@ -695,6 +697,17 @@ extern void _read_images(header_info **hList, uint32_t hCount);
 extern void prepare_load_methods(header_info *hi);
 extern void _unload_image(header_info *hi);
 extern const char ** _objc_copyClassNamesForImage(header_info *hi, unsigned int *outCount);
+
+#elif TARGET_OS_ANDROID
+
+extern id look_up_class(const char *aClassName, BOOL includeUnconnected, BOOL includeClassHandler);
+extern const char ** _objc_copyClassNamesForImage(header_info *hi, unsigned int *outCount);
+
+#else
+
+#error unknown OS
+
+#endif
 
 extern Class _objc_allocateFutureClass(const char *name);
 

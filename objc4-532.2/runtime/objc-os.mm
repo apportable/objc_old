@@ -1014,8 +1014,48 @@ const char *CRSetCrashLogMessage2(const char *msg)
 #endif
 
 // TARGET_OS_MAC
-#else
+#elif TARGET_OS_ANDROID
 
+void recursive_mutex_init(recursive_mutex_t *m)
+{
+    // fixme error checking
+    pthread_mutex_t *newmutex;
+
+    // Build recursive mutex attributes, if needed
+    static pthread_mutexattr_t *attr;
+    if (!attr) {
+        pthread_mutexattr_t *newattr = (pthread_mutexattr_t *)
+            malloc(sizeof(pthread_mutexattr_t));
+        pthread_mutexattr_init(newattr);
+        pthread_mutexattr_settype(newattr, PTHREAD_MUTEX_RECURSIVE);
+        while (!attr) {
+            if (OSAtomicCompareAndSwapPtrBarrier(0, newattr, (void**)&attr)) {
+                // we win
+                goto attr_done;
+            }
+        }
+        // someone else built the attr first
+        free(newattr);
+    }
+ attr_done:
+
+    // Build the mutex itself
+    newmutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+    pthread_mutex_init(newmutex, attr);
+    while (!m->mutex) {
+        if (OSAtomicCompareAndSwapPtrBarrier(0, newmutex, (void**)&m->mutex)) {
+            // we win
+            return;
+        }
+    }
+    
+    // someone else installed their mutex first
+    pthread_mutex_destroy(newmutex);
+}
+
+//crash reporting is done upstream
+
+#else
 
 #error unknown OS
 

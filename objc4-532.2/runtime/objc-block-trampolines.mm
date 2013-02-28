@@ -192,7 +192,7 @@ static inline void _assert_locked() {
 static TrampolineBlockPagePair *_allocateTrampolinesAndData(ArgumentMode aMode) {    
     _assert_locked();
 
-    vm_address_t dataAddress;
+    vm_address_t dataAddress = 0;
     
     // make sure certain assumptions are met
     assert(PAGE_SIZE == 4096);
@@ -211,7 +211,13 @@ static TrampolineBlockPagePair *_allocateTrampolinesAndData(ArgumentMode aMode) 
     if (headPagePair) {
         assert(headPagePair->nextAvailablePage == NULL);
     }
-    
+
+#if TARGET_OS_ANDROID
+
+#warning FIXME!
+
+#else
+
     int i;
     kern_return_t result = KERN_FAILURE;
     for(i = 0; i < 5; i++) {
@@ -255,7 +261,9 @@ static TrampolineBlockPagePair *_allocateTrampolinesAndData(ArgumentMode aMode) 
     
     if (result != KERN_SUCCESS)
         return NULL; 
-    
+
+#endif
+
     TrampolineBlockPagePair *pagePair = (TrampolineBlockPagePair *) dataAddress;
     pagePair->nextAvailable = _paddingSlotCount();
     pagePair->nextPagePair = NULL;

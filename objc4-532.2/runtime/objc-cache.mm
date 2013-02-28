@@ -742,6 +742,11 @@ void flush_cache(Class cls)
 #endif
 
 static uintptr_t _get_pc_for_thread(thread_t thread)
+#if TARGET_OS_ANDROID
+{
+    return PC_SENTINEL;
+}
+#else
 #if defined(__i386__)
 {
     i386_thread_state_t state;
@@ -758,6 +763,7 @@ static uintptr_t _get_pc_for_thread(thread_t thread)
 }
 #elif defined(__arm__)
 {
+
     arm_thread_state_t state;
     unsigned int count = ARM_THREAD_STATE_COUNT;
     kern_return_t okay = thread_get_state (thread, ARM_THREAD_STATE, (thread_state_t)&state, &count);
@@ -767,9 +773,10 @@ static uintptr_t _get_pc_for_thread(thread_t thread)
 {
 #error _get_pc_for_thread () not implemented for this architecture
 }
-#endif
+#endif // architecture switch
+#endif // TARGET_OS_ANDROID else
 
-#endif
+#endif // !TARGET_OS_WIN32
 
 /***********************************************************************
 * _collecting_in_critical.
@@ -783,7 +790,7 @@ OBJC_EXPORT uintptr_t objc_exitPoints[];
 
 static int _collecting_in_critical(void)
 {
-#if TARGET_OS_WIN32
+#if TARGET_OS_WIN32 || TARGET_OS_ANDROID
     return TRUE;
 #else
     thread_act_port_array_t threads;

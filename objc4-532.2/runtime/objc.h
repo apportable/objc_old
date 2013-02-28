@@ -84,6 +84,7 @@ typedef signed char		BOOL;
 #if !__has_feature(objc_arr)
 #define __unsafe_unretained /* empty */
 #define __autoreleasing /* empty */
+#define __weak /* empty */
 #endif
 
 

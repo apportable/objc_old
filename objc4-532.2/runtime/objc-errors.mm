@@ -72,6 +72,50 @@ void _objc_error(id rcv, const char *fmt, va_list args)
     abort();
 }
 
+#elif TARGET_OS_ANDROID
+
+#include <android/log.h>
+
+#define TAG "objc"
+
+void _objc_inform_on_crash(const char *fmt, ...)
+{
+
+}
+
+void _objc_inform(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    __android_log_vprint(ANDROID_LOG_INFO, TAG, fmt, args);
+    va_end(args);
+}
+
+void _objc_fatal(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    __android_log_vprint(ANDROID_LOG_FATAL, TAG, fmt, args);
+    va_end(args);
+    abort();
+}
+
+void __objc_error(id rcv, const char *fmt, ...) 
+{
+    va_list args;
+    va_start(args, fmt);
+    __android_log_vprint(ANDROID_LOG_ERROR, TAG, fmt, args);
+    va_end(args);
+    abort();
+}
+
+void _objc_error(id rcv, const char *fmt, va_list args) 
+{
+    __android_log_vprint(ANDROID_LOG_ERROR, TAG, fmt, args);
+    abort();
+}
+
+
 #else
 
 #include <vproc_priv.h>
