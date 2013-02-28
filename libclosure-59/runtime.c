@@ -14,7 +14,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <dlfcn.h>
-#if TARGET_IPHONE_SIMULATOR
+#if TARGET_IPHONE_SIMULATOR || TARGET_OS_ANDROID
 // workaround: 10682842
 #define osx_assumes(_x) (_x)
 #define osx_assert(_x) if (!(_x)) abort()
