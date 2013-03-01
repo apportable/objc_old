@@ -3042,15 +3042,8 @@ void _read_images(header_info **hList, uint32_t hCount)
             }
 
             totalClasses++;
-            if (headerInSharedCache  &&  isPreoptimized()) {
-                // class list built in shared cache
-                // fixme strict assert doesn't work because of duplicates
-                // assert(cls == getClass(name));
-                assert(getClass(name));
-                preoptimizedClasses++;
-            } else {
-                addNamedClass(cls, name);
-            }             
+
+            addNamedClass(cls, name);       
 
             // for future reference: shared cache never contains MH_BUNDLEs
             if (headerIsBundle) {
@@ -3293,7 +3286,246 @@ void prepare_load_methods(header_info *hi)
 
 #if TARGET_OS_ANDROID
 
-#warning FIXME!
+#import <libv/libv.h>
+#import "objc-runtime-new.h"
+
+static void objc_loadSelectorListSection(const char *section, uintptr_t start)
+{
+    static BOOL doneOnce = NO;
+    if (!doneOnce) {
+        doneOnce = YES;
+        sel_init(NO, 3500);
+    }
+    char **cursor = (char **)(start + sizeof(void *));
+
+    while (*cursor != NULL)
+    {
+        char *selector = *cursor;
+        sel_registerNameNoLock(selector, YES);
+        cursor = (char **)((uintptr_t)cursor + sizeof(void *));
+    }
+}
+
+static void objc_loadClassListSection(const char *section, uintptr_t start)
+{
+
+    size_t count;
+    size_t i;
+    class_t **resolvedFutureClasses = NULL;
+    size_t resolvedFutureClassCount = 0;
+    static unsigned int totalMethodLists;
+    static unsigned int preoptimizedMethodLists;
+    static unsigned int totalClasses;
+    static unsigned int preoptimizedClasses;
+
+    static BOOL doneOnce = NO;
+    size_t total = 0;
+    size_t unoptimizedTotal = 0;
+    
+    class_t **cursor = (class_t **)(start + sizeof(void *));
+
+    while (*cursor != NULL)
+    {
+        class_t *cls = *cursor;
+        total++;
+        cursor = (class_t **)((uintptr_t)cursor + sizeof(void *));
+    }
+
+    if (!doneOnce) {
+        doneOnce = YES;
+        initVtables();
+
+        if (PrintConnecting) {
+            _objc_inform("CLASS: found %zu classes during launch", total);
+        }
+
+        // namedClasses (NOT realizedClasses)
+        // Preoptimized classes don't go in this table.
+        // 4/3 is NXMapTable's load factor
+        size_t namedClassesSize = 
+            (isPreoptimized() ? unoptimizedTotal : total) * 4 / 3;
+        gdb_objc_realized_classes =
+            NXCreateMapTableFromZone(NXStrValueMapPrototype, namedClassesSize, 
+                                     _objc_internal_zone());
+        
+        // realizedClasses and realizedMetaclasses - less than the full total
+        realized_class_hash = 
+            NXCreateHashTableFromZone(NXPtrPrototype, total / 8, NULL, 
+                                      _objc_internal_zone());
+        realized_metaclass_hash = 
+            NXCreateHashTableFromZone(NXPtrPrototype, total / 8, NULL, 
+                                      _objc_internal_zone());
+    }
+
+    NXMapTable *future_named_class_map = futureNamedClasses();
+
+    DEBUG_LOG("%s %p", section, start);
+    cursor = (class_t **)(start + sizeof(void *));
+    while (*cursor != NULL)
+    {
+        class_t *cls = *cursor;
+        
+        const char *name = getName(cls);
+        DEBUG_LOG("Loading class_t data: %s", name);
+
+        if (missingWeakSuperclass(cls)) {
+            // No superclass (probably weak-linked). 
+            // Disavow any knowledge of this subclass.
+            if (PrintConnecting) {
+                _objc_inform("CLASS: IGNORING class '%s' with "
+                             "missing weak-linked superclass", name);
+            }
+            addRemappedClass(cls, NULL);
+            cls->superclass = NULL;
+            cursor += sizeof(class_t *);
+            continue;
+        }
+
+        class_t *newCls = NULL;
+        if (NXCountMapTable(future_named_class_map) > 0) {
+            newCls = (class_t *)NXMapGet(future_named_class_map, name);
+            removeFutureNamedClass(name);
+        }
+        
+        if (newCls) {
+            // Copy class_t to future class's struct.
+            // Preserve future's rw data block.
+            class_rw_t *rw = newCls->data();
+            memcpy(newCls, cls, sizeof(class_t));
+            rw->ro = (class_ro_t *)newCls->data();
+            newCls->setData(rw);
+            
+            addRemappedClass(cls, newCls);
+            cls = newCls;
+
+            // Non-lazily realize the class below.
+            resolvedFutureClasses = (class_t **)
+                _realloc_internal(resolvedFutureClasses, 
+                                  (resolvedFutureClassCount+1) 
+                                  * sizeof(class_t *));
+            resolvedFutureClasses[resolvedFutureClassCount++] = newCls;
+        }
+
+        totalClasses++;
+
+        addNamedClass(cls, name);          
+
+        // for future reference: shared cache never contains MH_BUNDLEs
+        // if (headerIsBundle) {
+        //     cls->data()->flags |= RO_FROM_BUNDLE;
+        //     cls->isa->data()->flags |= RO_FROM_BUNDLE;
+        // }
+
+        if (PrintPreopt) {
+            const method_list_t *mlist;
+            if ((mlist = ((class_ro_t *)cls->data())->baseMethods)) {
+                totalMethodLists++;
+                if (isMethodListFixedUp(mlist)) preoptimizedMethodLists++;
+            }
+            if ((mlist = ((class_ro_t *)cls->isa->data())->baseMethods)) {
+                totalMethodLists++;
+                if (isMethodListFixedUp(mlist)) preoptimizedMethodLists++;
+            }
+        }
+
+        cursor = (class_t **)((uintptr_t)cursor + sizeof(void *));
+    }
+}
+
+static void objc_loadCategoryListSection(const char *section, uintptr_t start)
+{
+    category_t **cursor = (category_t **)(start + sizeof(void *));
+
+    while (*cursor != NULL)
+    {
+        category_t *cat = *cursor;
+        class_t *cls = remapClass(cat->cls);
+
+        if (!cls) {
+            // Category's target class is missing (probably weak-linked).
+            // Disavow any knowledge of this category.
+            // catlist[i] = NULL;
+            if (PrintConnecting) {
+                _objc_inform("CLASS: IGNORING category \?\?\?(%s) %p with "
+                             "missing weak-linked target class", 
+                             cat->name, cat);
+            }
+            continue;
+        }
+
+        // Process this category. 
+        // First, register the category with its target class. 
+        // Then, rebuild the class's method lists (etc) if 
+        // the class is realized. 
+        BOOL classExists = NO;
+        if (cat->instanceMethods ||  cat->protocols  
+            ||  cat->instanceProperties) 
+        {
+            addUnattachedCategoryForClass(cat, cls, NULL);
+            if (isRealized(cls)) {
+                remethodizeClass(cls);
+                classExists = YES;
+            }
+            if (PrintConnecting) {
+                _objc_inform("CLASS: found category -%s(%s) %s", 
+                             getName(cls), cat->name, 
+                             classExists ? "on existing class" : "");
+            }
+        }
+
+        if (cat->classMethods  ||  cat->protocols  
+            /* ||  cat->classProperties */) 
+        {
+            addUnattachedCategoryForClass(cat, cls->isa, NULL);
+            if (isRealized(cls->isa)) {
+                remethodizeClass(cls->isa);
+            }
+            if (PrintConnecting) {
+                _objc_inform("CLASS: found category +%s(%s)", 
+                             getName(cls), cat->name);
+            }
+        }
+        cursor = (category_t **)((uintptr_t)cursor + sizeof(void *));
+    }
+}
+
+static void objc_loadSection(const char *section, uintptr_t start)
+{
+    static BOOL doneOnce = NO;
+    if (!doneOnce)
+    {
+        doneOnce = YES;
+        preopt_init();
+        // this is probably wrong... it should hook into NSInvocation?
+        // objc_setForwardHandler((void *)objc_msgSend, (void *)objc_msgSend_stret);
+    }
+
+    // THIS IS UGLY, HACKY, AND ALL AROUND DISTASTEFUL, but it works for now...
+    // I apologize to anyone that has to refactor this in advance.
+
+    if (strcmp(section, "__DATA, __objc_selrefs, literal_pointers, no_dead_strip") == 0)
+    {
+        objc_loadSelectorListSection(section, start);
+    }
+    else if (strcmp(section, "__DATA, __objc_classlist, regular, no_dead_strip") == 0)
+    {
+        objc_loadClassListSection(section, start);
+    }
+    else if (strcmp(section, "__DATA, __objc_catlist, regular, no_dead_strip") == 0)
+    {
+        objc_loadCategoryListSection(section, start);
+    }
+    else if (strcmp(section, "__DATA, __objc_protolist, coalesced, no_dead_strip") == 0)
+    {
+
+    }
+}
+
+static void __objc_section_initializer(void) __attribute__((constructor(0))); // ensure this is available for objc itself
+void __objc_section_initializer(void)
+{
+    __load_section = (void (*)(const char *, void *))&objc_loadSection;
+}
 
 #elif TARGET_OS_MAC
 

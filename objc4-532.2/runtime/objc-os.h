@@ -1135,7 +1135,7 @@ typedef struct {
     pthread_mutex_t mutex;
     pthread_cond_t cond;
 } monitor_t;
-#define MONITOR_INITIALIZER { PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER }
+#define MONITOR_INITIALIZER { PTHREAD_RECURSIVE_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER }
 #define MONITOR_NOT_ENTERED EPERM
 
 static inline int monitor_init(monitor_t *c) {

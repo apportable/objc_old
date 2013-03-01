@@ -1022,7 +1022,7 @@ void recursive_mutex_init(recursive_mutex_t *m)
     pthread_mutex_t *newmutex;
 
     // Build recursive mutex attributes, if needed
-    static pthread_mutexattr_t *attr;
+    static pthread_mutexattr_t *attr = NULL;
     if (!attr) {
         pthread_mutexattr_t *newattr = (pthread_mutexattr_t *)
             malloc(sizeof(pthread_mutexattr_t));
@@ -1038,13 +1038,14 @@ void recursive_mutex_init(recursive_mutex_t *m)
         free(newattr);
     }
  attr_done:
-
+    DEBUG_LOG("attr = %p", attr);
     // Build the mutex itself
     newmutex = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init(newmutex, attr);
     while (!m->mutex) {
         if (OSAtomicCompareAndSwapPtrBarrier(0, newmutex, (void**)&m->mutex)) {
             // we win
+            DEBUG_LOG("m->mutex = %p", m->mutex);
             return;
         }
     }
