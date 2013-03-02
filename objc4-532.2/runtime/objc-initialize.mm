@@ -255,7 +255,7 @@ static void _setThisThreadIsNotInitializingClass(Class cls)
     }
 
     // no list or not found in list
-    // _objc_fatal("thread is not initializing this class!");  
+    _objc_fatal("thread is not initializing this class!");  
 }
 
 
@@ -422,11 +422,11 @@ void _class_initialize(Class cls)
         if (_thisThreadIsInitializingClass(cls)) {
             return;
         } else {
-            // monitor_enter(&classInitLock);
-            // while (!_class_isInitialized(cls)) {
-            //     monitor_wait(&classInitLock);
-            // }
-            // monitor_exit(&classInitLock);
+            monitor_enter(&classInitLock);
+            while (!_class_isInitialized(cls)) {
+                monitor_wait(&classInitLock);
+            }
+            monitor_exit(&classInitLock);
             return;
         }
     }
