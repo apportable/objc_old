@@ -5263,8 +5263,9 @@ static method_t *search_method_list(const method_list_t *mlist, SEL sel)
 }
 
 static method_t *
-getMethodNoSuper_nolock(class_t *cls, SEL sel)
+getMethodNoSuper_nolock(class_t *cls, SEL s)
 {
+    SEL sel = sel_getUid(sel_getName(s));
     rwlock_assert_locked(&runtimeLock);
 
     assert(isRealized(cls));
