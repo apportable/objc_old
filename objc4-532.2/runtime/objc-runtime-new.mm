@@ -3297,7 +3297,7 @@ static void objc_loadSelectorListSection(const char *section, uintptr_t start)
     {
         char *selector = *cursor;
         DEBUG_LOG("selector %s", selector);
-        sel_registerNameNoLock(selector, YES);
+        sel_registerNameNoLock(selector, NO);
         cursor = (char **)((uintptr_t)cursor + sizeof(void *));
     }
 }
