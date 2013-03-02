@@ -445,6 +445,10 @@ extern Class _objc_tagged_isa_table[16];
 
 static inline int ignoreSelector(SEL sel)
 {
+    if (sel == NULL)
+    {
+        return YES;
+    }
 #if !SUPPORT_GC
     return NO;
 #elif SUPPORT_IGNORED_SELECTOR_CONSTANT

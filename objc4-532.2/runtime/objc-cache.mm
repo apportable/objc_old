@@ -630,7 +630,14 @@ IMP _cache_addIgnoredEntry(Class cls, SEL sel)
     cache_entry *entryp = NULL;
 
 #if !SUPPORT_GC
-    _objc_fatal("selector ignored with GC off");
+    if (sel != NULL)
+    {
+        _objc_fatal("selector ignored with GC off");
+    }
+    else
+    {
+        return (IMP)&_objc_ignored_method;
+    }
 #elif SUPPORT_IGNORED_SELECTOR_CONSTANT
     static cache_entry entry = { (SEL)kIgnore, 0, (IMP)&_objc_ignored_method };
     entryp = &entry;
