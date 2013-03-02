@@ -9,7 +9,7 @@ flags = [
 ]
 
 defines = {
-    'BUILDING_OBJC_RUNTIME' : 1,
+    'BUILDING_OBJC_RUNTIME': 1,
 }
 
 header_paths = [

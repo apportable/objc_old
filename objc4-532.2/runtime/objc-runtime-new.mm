@@ -3291,16 +3291,12 @@ void prepare_load_methods(header_info *hi)
 
 static void objc_loadSelectorListSection(const char *section, uintptr_t start)
 {
-    static BOOL doneOnce = NO;
-    if (!doneOnce) {
-        doneOnce = YES;
-        sel_init(NO, 3500);
-    }
     char **cursor = (char **)(start + sizeof(void *));
 
     while (*cursor != NULL)
     {
         char *selector = *cursor;
+        DEBUG_LOG("selector %s", selector);
         sel_registerNameNoLock(selector, YES);
         cursor = (char **)((uintptr_t)cursor + sizeof(void *));
     }
@@ -3489,13 +3485,23 @@ static void objc_loadCategoryListSection(const char *section, uintptr_t start)
     }
 }
 
+extern SEL _FwdSel; // in objc-msg-*.s
+
 static void objc_loadSection(const char *section, uintptr_t start)
 {
     static BOOL doneOnce = NO;
     if (!doneOnce)
     {
         doneOnce = YES;
+        environ_init();
+        tls_init();
+        lock_init();
+        exception_init();
         preopt_init();
+        sel_init(NO, 35000);
+        _FwdSel = sel_registerName("forward::");
+
+        arr_init();
         // this is probably wrong... it should hook into NSInvocation?
         // objc_setForwardHandler((void *)objc_msgSend, (void *)objc_msgSend_stret);
     }

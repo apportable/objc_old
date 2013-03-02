@@ -56,7 +56,7 @@
 #endif
 
 // Define SUPPORT_PREOPT=1 to enable dyld shared cache optimizations
-#if TARGET_OS_WIN32  ||  TARGET_IPHONE_SIMULATOR
+#if TARGET_OS_WIN32  ||  TARGET_IPHONE_SIMULATOR || TARGET_OS_ANDROID
 #   define SUPPORT_PREOPT 0
 #else
 #   define SUPPORT_PREOPT 1
