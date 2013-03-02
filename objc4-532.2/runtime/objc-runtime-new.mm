@@ -3291,15 +3291,18 @@ void prepare_load_methods(header_info *hi)
 
 static void objc_loadSelectorListSection(const char *section, uintptr_t start)
 {
-    char **cursor = (char **)(start + sizeof(void *));
+    char *cursor = (char *)(start + sizeof(void *));
 
-    while (*cursor != NULL)
+    sel_lock();
+    while (cursor && *cursor != NULL)
     {
-        char *selector = *cursor;
-        DEBUG_LOG("selector %s", selector);
-        sel_registerNameNoLock(selector, NO);
-        cursor = (char **)((uintptr_t)cursor + sizeof(void *));
+        const char *name = cursor;
+        size_t name_len = strlen(name);
+        DEBUG_LOG("selector %s", name);
+        sel_registerNameNoLock(name, NO);
+        cursor = (char *)((uintptr_t)cursor + name_len + 1);
     }
+    sel_unlock();
 }
 
 static void objc_loadClassListSection(const char *section, uintptr_t start)
@@ -3426,6 +3429,28 @@ static void objc_loadClassListSection(const char *section, uintptr_t start)
 
         cursor = (class_t **)((uintptr_t)cursor + sizeof(void *));
     }
+
+    if (!noClassesRemapped())
+    {
+        cursor = (class_t **)(start + sizeof(void *));
+        while (*cursor != NULL)
+        {
+            class_t *cls = *cursor;
+            remapClassRef(&cls);
+            cursor = (class_t **)((uintptr_t)cursor + sizeof(void *));
+        }
+    }
+}
+
+static void objc_loadSuperClassListSection(const char *section, uintptr_t start)
+{
+    class_t **cursor = (class_t **)(start + sizeof(void *));
+    while (*cursor != NULL)
+    {
+        class_t *cls = *cursor;
+        remapClassRef(&cls);
+        cursor = (class_t **)((uintptr_t)cursor + sizeof(void *));
+    }
 }
 
 static void objc_loadCategoryListSection(const char *section, uintptr_t start)
@@ -3509,7 +3534,7 @@ static void objc_loadSection(const char *section, uintptr_t start)
     // THIS IS UGLY, HACKY, AND ALL AROUND DISTASTEFUL, but it works for now...
     // I apologize to anyone that has to refactor this in advance.
 
-    if (strcmp(section, "__DATA, __objc_selrefs, literal_pointers, no_dead_strip") == 0)
+    if (strcmp(section, "__TEXT,__objc_methname,cstring_literals") == 0)
     {
         objc_loadSelectorListSection(section, start);
     }
