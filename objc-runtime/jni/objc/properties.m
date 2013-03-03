@@ -158,10 +158,7 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 	{
 		count += l->count;
 	}
-	if (NULL != outCount)
-	{
-		*outCount = count;
-	}
+
 	if (0 == count)
 	{
 		return NULL;
@@ -173,8 +170,15 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 		for (int i=0 ; i<properties->count ; i++)
 		{
 			list[out] = &l->properties[i];
+			out++;
 		}
 	}
+	
+	if (NULL != outCount)
+	{
+		*outCount = out;
+	}
+
 	return list;
 }
 
