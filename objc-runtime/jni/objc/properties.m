@@ -161,6 +161,10 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 
 	if (0 == count)
 	{
+		if (NULL != outCount)
+		{
+			*outCount = 0;
+		}
 		return NULL;
 	}
 	objc_property_t *list = calloc(count,sizeof(objc_property_t));
