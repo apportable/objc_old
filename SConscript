@@ -10,6 +10,7 @@ flags = [
 
 defines = {
     'BUILDING_OBJC_RUNTIME': 1,
+    'NDEBUG' : 1,
 }
 
 header_paths = [
@@ -76,7 +77,6 @@ sources = [
     'objc4-532.2/runtime/objc-weak.mm',
     'objc4-532.2/runtime/NSObject.mm',
     'objc4-532.2/runtime/objc-opt.mm',
-    'objc4-532.2/runtime/data.c',
     'libclosure-59/runtime.c',
     'libclosure-59/data.c',
 ]
