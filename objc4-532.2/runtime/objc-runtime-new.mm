@@ -2784,7 +2784,12 @@ Class _objc_allocateFutureClass(const char *name)
 **********************************************************************/
 void objc_setFutureClass(Class cls, const char *name)
 {
-    // fixme hack do nothing - NSCFString handled specially elsewhere
+    rwlock_write(&runtimeLock);
+    
+    memset(cls, 0, sizeof(class_t));
+    addFutureNamedClass(name, (class_t *)cls);
+    
+    rwlock_unlock_write(&runtimeLock);
 }
 
 
@@ -3299,9 +3304,22 @@ static void objc_loadSelectorListSection(const char *section, uintptr_t start)
     while (cursor && *cursor != NULL) {
         const char *name = cursor;
         size_t name_len = strlen(name);
-        DEBUG_LOG("selector %s", name);
-        sel_registerNameNoLock(name, NO);
+        // DEBUG_LOG("selector %s", name);
+        // sel_registerNameNoLock(name, NO);
         cursor = (char *)((uintptr_t)cursor + name_len + 1);
+    }
+    sel_unlock();
+}
+
+static void objc_loadSelectorRefsSection(const char *section, uintptr_t start)
+{
+    SEL *cursor = (SEL *)(start + sizeof(void *));
+
+    sel_lock();
+    while (*cursor != NULL) {
+        SEL sel = *cursor;
+        *cursor = sel_registerNameNoLock((char *)sel, NO);
+        cursor = (SEL *)((uintptr_t)cursor + sizeof(void *));
     }
     sel_unlock();
 }
@@ -3365,12 +3383,6 @@ static void objc_loadClassListSection(const char *section, uintptr_t start)
         
         const char *name = getName(cls);
         DEBUG_LOG("Loading class_t data: %s", name);
-
-        // Forward hook for NSConstantString to bind to __CFConstantStringClassReference
-        if (strcmp(name, "NSConstantString") == 0) {
-            cls = &__CFConstantStringClassReference;
-            memcpy(cls, *cursor, sizeof(class_t));
-        }
 
         if (missingWeakSuperclass(cls)) {
             // No superclass (probably weak-linked). 
@@ -3527,6 +3539,8 @@ static void objc_loadSection(const char *section, uintptr_t start) {
 
     if (strcmp(section, "__TEXT,__objc_methname,cstring_literals") == 0) {
         objc_loadSelectorListSection(section, start);
+    } else if (strcmp(section, "__DATA, __objc_selrefs, literal_pointers, no_dead_strip") == 0) {
+        objc_loadSelectorRefsSection(section, start);
     } else if (strcmp(section, "__DATA, __objc_classlist, regular, no_dead_strip") == 0) {
         objc_loadClassListSection(section, start);
     } else if (strcmp(section, "__DATA, __objc_catlist, regular, no_dead_strip") == 0) {
@@ -5247,9 +5261,8 @@ static method_t *search_method_list(const method_list_t *mlist, SEL sel)
 }
 
 static method_t *
-getMethodNoSuper_nolock(class_t *cls, SEL s)
+getMethodNoSuper_nolock(class_t *cls, SEL sel)
 {
-    SEL sel = sel_getUid(sel_getName(s));
     rwlock_assert_locked(&runtimeLock);
 
     assert(isRealized(cls));
