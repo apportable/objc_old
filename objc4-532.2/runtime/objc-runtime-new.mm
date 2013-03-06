@@ -3289,13 +3289,14 @@ void prepare_load_methods(header_info *hi)
 #import <libv/libv.h>
 #import "objc-runtime-new.h"
 
+extern class_t __CFConstantStringClassReference;
+
 static void objc_loadSelectorListSection(const char *section, uintptr_t start)
 {
     char *cursor = (char *)(start + sizeof(void *));
 
     sel_lock();
-    while (cursor && *cursor != NULL)
-    {
+    while (cursor && *cursor != NULL) {
         const char *name = cursor;
         size_t name_len = strlen(name);
         DEBUG_LOG("selector %s", name);
@@ -3323,8 +3324,7 @@ static void objc_loadClassListSection(const char *section, uintptr_t start)
     
     class_t **cursor = (class_t **)(start + sizeof(void *));
 
-    while (*cursor != NULL)
-    {
+    while (*cursor != NULL) {
         class_t *cls = *cursor;
         total++;
         cursor = (class_t **)((uintptr_t)cursor + sizeof(void *));
@@ -3360,12 +3360,17 @@ static void objc_loadClassListSection(const char *section, uintptr_t start)
 
     DEBUG_LOG("%s %p", section, start);
     cursor = (class_t **)(start + sizeof(void *));
-    while (*cursor != NULL)
-    {
+    while (*cursor != NULL) {
         class_t *cls = *cursor;
         
         const char *name = getName(cls);
         DEBUG_LOG("Loading class_t data: %s", name);
+
+        // Forward hook for NSConstantString to bind to __CFConstantStringClassReference
+        if (strcmp(name, "NSConstantString") == 0) {
+            cls = &__CFConstantStringClassReference;
+            memcpy(cls, *cursor, sizeof(class_t));
+        }
 
         if (missingWeakSuperclass(cls)) {
             // No superclass (probably weak-linked). 
@@ -3407,13 +3412,7 @@ static void objc_loadClassListSection(const char *section, uintptr_t start)
 
         totalClasses++;
 
-        addNamedClass(cls, name);          
-
-        // for future reference: shared cache never contains MH_BUNDLEs
-        // if (headerIsBundle) {
-        //     cls->data()->flags |= RO_FROM_BUNDLE;
-        //     cls->isa->data()->flags |= RO_FROM_BUNDLE;
-        // }
+        addNamedClass(cls, name);
 
         if (PrintPreopt) {
             const method_list_t *mlist;
@@ -3430,11 +3429,9 @@ static void objc_loadClassListSection(const char *section, uintptr_t start)
         cursor = (class_t **)((uintptr_t)cursor + sizeof(void *));
     }
 
-    if (!noClassesRemapped())
-    {
+    if (!noClassesRemapped()) {
         cursor = (class_t **)(start + sizeof(void *));
-        while (*cursor != NULL)
-        {
+        while (*cursor != NULL) {
             class_t *cls = *cursor;
             remapClassRef(&cls);
             cursor = (class_t **)((uintptr_t)cursor + sizeof(void *));
@@ -3445,8 +3442,7 @@ static void objc_loadClassListSection(const char *section, uintptr_t start)
 static void objc_loadSuperClassListSection(const char *section, uintptr_t start)
 {
     class_t **cursor = (class_t **)(start + sizeof(void *));
-    while (*cursor != NULL)
-    {
+    while (*cursor != NULL) {
         class_t *cls = *cursor;
         remapClassRef(&cls);
         cursor = (class_t **)((uintptr_t)cursor + sizeof(void *));
@@ -3457,8 +3453,7 @@ static void objc_loadCategoryListSection(const char *section, uintptr_t start)
 {
     category_t **cursor = (category_t **)(start + sizeof(void *));
 
-    while (*cursor != NULL)
-    {
+    while (*cursor != NULL) {
         category_t *cat = *cursor;
         class_t *cls = remapClass(cat->cls);
 
@@ -3480,8 +3475,7 @@ static void objc_loadCategoryListSection(const char *section, uintptr_t start)
         // the class is realized. 
         BOOL classExists = NO;
         if (cat->instanceMethods ||  cat->protocols  
-            ||  cat->instanceProperties) 
-        {
+            ||  cat->instanceProperties) {
             addUnattachedCategoryForClass(cat, cls, NULL);
             if (isRealized(cls)) {
                 remethodizeClass(cls);
@@ -3495,8 +3489,7 @@ static void objc_loadCategoryListSection(const char *section, uintptr_t start)
         }
 
         if (cat->classMethods  ||  cat->protocols  
-            /* ||  cat->classProperties */) 
-        {
+            /* ||  cat->classProperties */) {
             addUnattachedCategoryForClass(cat, cls->isa, NULL);
             if (isRealized(cls->isa)) {
                 remethodizeClass(cls->isa);
@@ -3512,11 +3505,9 @@ static void objc_loadCategoryListSection(const char *section, uintptr_t start)
 
 extern SEL _FwdSel; // in objc-msg-*.s
 
-static void objc_loadSection(const char *section, uintptr_t start)
-{
+static void objc_loadSection(const char *section, uintptr_t start) {
     static BOOL doneOnce = NO;
-    if (!doneOnce)
-    {
+    if (!doneOnce) {
         doneOnce = YES;
         environ_init();
         tls_init();
@@ -3534,21 +3525,14 @@ static void objc_loadSection(const char *section, uintptr_t start)
     // THIS IS UGLY, HACKY, AND ALL AROUND DISTASTEFUL, but it works for now...
     // I apologize to anyone that has to refactor this in advance.
 
-    if (strcmp(section, "__TEXT,__objc_methname,cstring_literals") == 0)
-    {
+    if (strcmp(section, "__TEXT,__objc_methname,cstring_literals") == 0) {
         objc_loadSelectorListSection(section, start);
-    }
-    else if (strcmp(section, "__DATA, __objc_classlist, regular, no_dead_strip") == 0)
-    {
+    } else if (strcmp(section, "__DATA, __objc_classlist, regular, no_dead_strip") == 0) {
         objc_loadClassListSection(section, start);
-    }
-    else if (strcmp(section, "__DATA, __objc_catlist, regular, no_dead_strip") == 0)
-    {
+    } else if (strcmp(section, "__DATA, __objc_catlist, regular, no_dead_strip") == 0) {
         objc_loadCategoryListSection(section, start);
-    }
-    else if (strcmp(section, "__DATA, __objc_protolist, coalesced, no_dead_strip") == 0)
-    {
-
+    } else if (strcmp(section, "__DATA, __objc_protolist, coalesced, no_dead_strip") == 0) {
+        // TODO: FIXME!
     }
 }
 

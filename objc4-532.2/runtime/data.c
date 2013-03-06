@@ -1,2 +1,2 @@
 
-void * __CFConstantStringClassReference[32] = { 0 };
+int __CFConstantStringClassReference[24] = { 0 };
