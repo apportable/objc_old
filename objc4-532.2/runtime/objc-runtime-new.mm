@@ -3293,6 +3293,7 @@ void prepare_load_methods(header_info *hi)
 
 #import <libv/libv.h>
 #import "objc-runtime-new.h"
+#import "Block_private.h"
 
 extern class_t __CFConstantStringClassReference;
 
@@ -3527,6 +3528,13 @@ static void objc_loadSection(const char *section, uintptr_t start) {
         exception_init();
         preopt_init();
         sel_init(NO, 35000);
+        Block_callbacks_RR callbacks = {
+            sizeof(Block_callbacks_RR),
+            (void (*)(const void *))&objc_retain,
+            (void (*)(const void *))&objc_release,
+            (void (*)(const void *))&_objc_rootDealloc,
+        };
+        _Block_use_RR2(&callbacks);
         _FwdSel = sel_registerName("forward::");
 
         arr_init();

@@ -17,7 +17,8 @@ header_paths = [
     "objc4-532.2",
     "objc4-532.2/runtime",
     "objc4-532.2/runtime/Accessors.subproj",
-    "../dispatch/include"
+    "../dispatch/include",
+    "libclosure-59"
 ]
 
 deps = [
@@ -78,7 +79,7 @@ sources = [
     'objc4-532.2/runtime/NSObject.mm',
     'objc4-532.2/runtime/objc-opt.mm',
     'libclosure-59/runtime.c',
-    'libclosure-59/data.c',
+    'libclosure-59/NSBlock.m',
 ]
 
 libs = [
