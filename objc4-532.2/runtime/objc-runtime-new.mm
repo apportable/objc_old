@@ -3532,7 +3532,7 @@ static void objc_loadSection(const char *section, uintptr_t start) {
             sizeof(Block_callbacks_RR),
             (void (*)(const void *))&objc_retain,
             (void (*)(const void *))&objc_release,
-            (void (*)(const void *))&_objc_rootDealloc,
+            (void (*)(const void *))&objc_destructInstance,
         };
         _Block_use_RR2(&callbacks);
         _FwdSel = sel_registerName("forward::");
