@@ -203,7 +203,6 @@ _objc_exitPoints:
 #endif
 	.align 5
 	.globl    \name
-	.type     \name, %function
 #ifdef THUMB
 	.thumb_func
 #endif
@@ -217,7 +216,6 @@ _objc_exitPoints:
 #endif
 	.align 5
 	.globl \name
-	.type  \name, %function
 #ifdef THUMB
 	.thumb_func
 #endif
