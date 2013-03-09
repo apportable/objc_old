@@ -83,7 +83,6 @@
 #   define SUPPORT_FIXUP 0
 #else
 #   define SUPPORT_FIXUP 1
- #error
 #endif
 
 // Define SUPPORT_VTABLE=1 to enable vtable dispatch for OBJC2.
@@ -92,7 +91,6 @@
 #   define SUPPORT_VTABLE 0
 #else
 #   define SUPPORT_VTABLE 1
- #error
 #endif
 
 // Define SUPPORT_IGNORED_SELECTOR_CONSTANT to remap GC-ignored selectors.
