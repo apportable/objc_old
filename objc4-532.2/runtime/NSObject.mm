@@ -856,7 +856,7 @@ public:
     static void printAll()
     {        
         _objc_inform("##############");
-        _objc_inform("AUTORELEASE POOLS for thread %p", pthread_self());
+        _objc_inform("AUTORELEASE POOLS for thread %ld", pthread_self());
 
         AutoreleasePoolPage *page;
         ptrdiff_t objects = 0;
@@ -886,7 +886,7 @@ public:
             }
             
             _objc_inform("POOL HIGHWATER: new high water mark of %u "
-                         "pending autoreleases for thread %p:", 
+                         "pending autoreleases for thread %ld:", 
                          mark, pthread_self());
 #ifndef APPORTABLE // TODO: FIXME!
             void *stack[128];
