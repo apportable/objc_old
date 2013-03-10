@@ -44,10 +44,6 @@
 #define THUMB 1
 #endif
 
-#if TARGET_OS_ANDROID
-#undef THUMB
-#endif
-
 .syntax unified	
 	
 #if defined(__DYNAMIC__)
