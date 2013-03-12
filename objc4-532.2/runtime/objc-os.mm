@@ -1016,6 +1016,194 @@ const char *CRSetCrashLogMessage2(const char *msg)
 // TARGET_OS_MAC
 #elif TARGET_OS_ANDROID
 
+
+/***********************************************************************
+* map_images_nolock
+* Process the given images which are being mapped in by dyld.
+* All class registration and fixups are performed (or deferred pending
+* discovery of missing superclasses etc), and +load methods are called.
+*
+* info[] is in bottom-up order i.e. libobjc will be earlier in the 
+* array than any library that links to libobjc.
+*
+* Locking: loadMethodLock(old) or runtimeLock(new) acquired by map_images.
+**********************************************************************/
+#if __OBJC2__
+#include "objc-file.h"
+#else
+#include "objc-file-old.h"
+#endif
+
+static header_info * addHeader(const headerType *mhdr)
+{
+    header_info *hi;
+
+#if __OBJC2__
+    // Look for hinfo from the dyld shared cache.
+    hi = preoptimizedHinfoForHeader(mhdr);
+    if (hi) {
+        // Found an hinfo in the dyld shared cache.
+
+        // Weed out duplicates.
+        if (hi->loaded) {
+            return NULL;
+        }
+
+        // Initialize fields not set by the shared cache
+        // hi->next is set by appendHeader
+        hi->loaded = true;
+        hi->inSharedCache = true;
+
+        if (PrintPreopt) {
+            _objc_inform("PREOPTIMIZATION: honoring preoptimized header info at %p for %s", hi, hi->fname);
+        }
+
+    }
+    else 
+#endif
+    {
+        // Didn't find an hinfo in the dyld shared cache.
+
+        // Weed out duplicates
+        for (hi = FirstHeader; hi; hi = hi->next) {
+            if (mhdr == hi->mhdr) return NULL;
+        }
+
+        // Allocate a header_info entry.
+        hi = (header_info *)_calloc_internal(sizeof(header_info), 1);
+
+        // Set up the new header_info entry.
+        hi->mhdr = mhdr;
+        hi->loaded = true;
+        hi->inSharedCache = false;
+        hi->allClassesRealized = NO;
+    }
+
+    appendHeader(hi);
+    
+    return hi;
+}
+
+const char *_gcForHInfo(const header_info *hinfo)
+{
+    return "";
+}
+const char *_gcForHInfo2(const header_info *hinfo)
+{
+    return "";
+}
+
+const char *
+map_images_nolock(image_state state, uint32_t infoCount,
+                  const struct dyld_image_info infoList[])
+{
+    static BOOL firstTime = YES;
+    static BOOL wantsGC = NO;
+    static BOOL wantsCompaction = NO;
+    uint32_t i;
+    header_info *hi;
+    header_info *hList[infoCount];
+    uint32_t hCount;
+    size_t selrefCount = 0;
+
+    // Perform first-time initialization if necessary.
+    // This function is called before ordinary library initializers. 
+    // fixme defer initialization until an objc-using image is found?
+    if (firstTime) {
+        preopt_init();
+    }
+
+    if (PrintImages) {
+        _objc_inform("IMAGES: processing %u newly-mapped images...\n", infoCount);
+    }
+
+
+    // Find all images with Objective-C metadata.
+    hCount = 0;
+    i = infoCount;
+    while (i--) {
+        const headerType *mhdr = (headerType *)infoList[i].imageLoadAddress;
+
+        hi = addHeader(mhdr);
+        if (!hi) {
+            // no objc data in this entry
+            continue;
+        }
+        if (mhdr->filetype == MH_EXECUTE) {
+#if __OBJC2__
+            size_t count;
+            _getObjc2SelectorRefs(hi, &count);
+            selrefCount += count;
+            _getObjc2MessageRefs(hi, &count);
+            selrefCount += count;
+#else
+            _getObjcSelectorRefs(hi, &selrefCount);
+#endif
+        }
+
+        hList[hCount++] = hi;
+        
+
+        if (PrintImages) {
+            _objc_inform("IMAGES: loading image for %s%s%s%s%s\n", 
+                         hi->fname, 
+                         mhdr->filetype == MH_BUNDLE ? " (bundle)" : "", 
+                         _objcHeaderIsReplacement(hi) ? " (replacement)" : "",
+                         _objcHeaderOptimizedByDyld(hi)?" (preoptimized)" : "",
+                         _gcForHInfo2(hi));
+        }
+    }
+
+    if (firstTime) {
+        extern SEL _FwdSel;  // in objc-msg-*.s
+        sel_init(wantsGC, selrefCount);
+        _FwdSel = sel_registerName("forward::");
+
+        arr_init();
+    }
+
+    _read_images(hList, hCount);
+
+    firstTime = NO;
+
+    return NULL;
+}
+
+
+/***********************************************************************
+* load_images_nolock
+* Prepares +load in the given images which are being mapped in by dyld.
+* Returns YES if there are now +load methods to be called by call_load_methods.
+*
+* Locking: loadMethodLock(both) and runtimeLock(new) acquired by load_images
+**********************************************************************/
+BOOL 
+load_images_nolock(image_state state,uint32_t infoCount,
+                   const struct dyld_image_info infoList[])
+{
+    BOOL found = NO;
+    uint32_t i;
+
+    i = infoCount;
+    while (i--) {
+        header_info *hi;
+        for (hi = FirstHeader; hi != NULL; hi = hi->next) {
+            const headerType *mhdr = (headerType*)infoList[i].imageLoadAddress;
+            if (hi->mhdr == mhdr) {
+                prepare_load_methods(hi);
+                found = YES;
+            }
+        }
+    }
+
+    return found;
+}
+
+bool crashlog_header_name(header_info *hi)
+{
+    return true;
+}
+
 void recursive_mutex_init(recursive_mutex_t *m)
 {
     // fixme error checking

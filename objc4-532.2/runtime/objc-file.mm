@@ -25,11 +25,8 @@
 
 #include "objc-private.h"
 #include "objc-file.h"
-#if TARGET_OS_ANDROID
 
-#warning FIXME!
-
-#elif TARGET_IPHONE_SIMULATOR
+#if TARGET_IPHONE_SIMULATOR
 // getsectiondata() not yet available
 
 // 1. Find segment with file offset == 0 and file size != 0. This segment's
@@ -104,9 +101,183 @@ objc_getsegmentdata(const struct mach_header *mh, const char *segname, unsigned 
 }
 
 // TARGET_IPHONE_SIMULATOR
+#elif TARGET_OS_ANDROID
+
+#include <dlfcn.h>
+#include <string.h>
+
+static struct dyld_image_info *base_image_info = NULL;
+static struct dyld_image_info *current_image_info = NULL;
+
+static int section_info(const char *section_name, size_t *step)
+{
+    int section_index = -1;
+    size_t section_step = 0;
+    if (section_name == NULL) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__objc_data") == 0) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__objc_classrefs") == 0) {
+        section_index = 2;
+        section_step = sizeof(class_t *);
+    } else if (strcmp(section_name, "__objc_methname") == 0) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__objc_msgrefs") == 0) {
+        section_index = 1;
+        section_step = sizeof(message_ref_t);
+    } else if (strcmp(section_name, "__objc_superrefs") == 0) {
+        section_index = 3;
+        section_step = sizeof(class_t *);
+    } else if (strcmp(section_name, "__objc_ivar") == 0) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__objc_classname") == 0) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__objc_methtype") == 0) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__objc_const") == 0) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__cfstring") == 0) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__objc_classlist") == 0) {
+        section_index = 4;
+        section_step = sizeof(classref_t);
+    } else if (strcmp(section_name, "__objc_nlclslist") == 0) {
+        section_index = 5;
+        section_step = sizeof(classref_t);
+    } else if (strcmp(section_name, "__objc_catlist") == 0) {
+        section_index = 6;
+        section_step = sizeof(category_t *);
+    } else if (strcmp(section_name, "__objc_nlcatlist") == 0) {
+        section_index = 7;
+        section_step = sizeof(category_t *);
+    } else if (strcmp(section_name, "__cstring") == 0) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__objc_selrefs") == 0) {
+        section_index = 0;
+        section_step = sizeof(SEL);
+    } else if (strcmp(section_name, "__datacoal_nt") == 0) {
+        // reserved for future use
+    } else if (strcmp(section_name, "__objc_protolist") == 0) {
+        section_index = 8;
+        section_step = sizeof(protocol_t *);
+    } else if (strcmp(section_name, "__objc_protorefs") == 0) {
+        section_index = 9;
+        section_step = sizeof(protocol_t *);
+    }
+    *step = section_step;
+    return section_index;
+}
+
+extern "C" void __load_section(const char *section, uintptr_t start) __attribute((visibility("default")));
+void __load_section(const char *section, uintptr_t start)
+{
+    static BOOL initialized = NO;
+    if (!initialized) {
+        environ_init();
+        tls_init();
+        lock_init();
+        exception_init();
+    }
+    if (section == NULL && start == 0) { // signifies that the section list is finished for this module
+        map_images(0, 1, current_image_info);
+        load_images(0, 1, current_image_info);        
+        return;
+    }
+    Dl_info info;
+    int err = dladdr((const void *)start, &info);
+    const char *library = info.dli_fname;
+
+    if (base_image_info == NULL) {
+        base_image_info = (struct dyld_image_info *)calloc(1, sizeof(struct dyld_image_info));
+        base_image_info->name = strdup(library);
+        current_image_info = base_image_info;
+    }
+    else if (strcmp(current_image_info->name, library) != 0) {
+        current_image_info->next = (struct dyld_image_info *)calloc(1, sizeof(struct dyld_image_info));
+        current_image_info = current_image_info->next;
+        current_image_info->name = strdup(library);
+    }
+    
+    headerType *header = (headerType *)current_image_info->imageLoadAddress;
+    if (header == NULL) {
+        header = (headerType *)calloc(1, sizeof(headerType));
+        current_image_info->imageLoadAddress = (uintptr_t)header;
+    }
+
+    char *brkt = NULL;
+    const char *sep = ",";
+    char *section_name = NULL;
+    int idx = 0;
+    char *local_section = strdup(section);
+    for (char *word = strtok_r(local_section, sep, &brkt); word != NULL && idx < 2; word = strtok_r(NULL, sep, &brkt)) {
+        // probably we could do more with the other section data
+        // expample of expansion of section names into their subsections
+        //
+        // __DATA, __objc_selrefs, literal_pointers, no_dead_strip
+        // -sect-|----subsect----|-------extra linker data--------
+        //
+        // ELF sections treat this however as a full section name, so any sections MUST be matched 100% to be
+        // coalesced by the linker
+
+        if (idx == 1) {
+            section_name = word;
+            while (*word != '\0') {
+                if (!isspace(*word)) {
+                    section_name = word;
+                    break;
+                }
+                word++;
+            }
+        }
+        idx++;
+    }
+
+    int section_index = -1;
+    size_t section_step = 0;
+    
+    section_index = section_info(section_name, &section_step);
+
+    if (section_index != -1) {
+        header->segments[section_index].segname = strdup(section_name);
+        void **cursor = (void **)(start + sizeof(void *));
+        header->segments[section_index].count = 0;
+        header->segments[section_index].start_address = cursor;
+        while (*cursor != NULL) {
+            header->segments[section_index].count++;
+            cursor = (void **)((uintptr_t)cursor + section_step);
+        }
+    }
+
+    free(local_section);
+}
+
+uint8_t *objc_getsectiondata(const headerType *mh, const char *segname, const char *sectname, unsigned long *outSize)
+{
+    int section_index = -1;
+    size_t section_step = 0;
+    
+    section_index = section_info(sectname, &section_step);
+    if (outSize != NULL) {
+        if (section_index != -1) {
+            *outSize = section_step * mh->segments[section_index].count;
+        } else {
+            *outSize = 0;
+        }
+    }
+    if (section_index != -1) {
+        return (uint8_t *)mh->segments[section_index].start_address;
+    } else {
+        return NULL;
+    }
+}
+
+uint8_t * objc_getsegmentdata(const headerType *mh, const char *segname, unsigned long *outSize)
+{
+    return NULL;
+}
+
 #endif
 
-#if !TARGET_OS_ANDROID
 #define GETSECT(name, type, sectname)                                   \
     type *name(const header_info *hi, size_t *outCount)  \
     {                                                                   \
@@ -122,8 +293,8 @@ GETSECT(_getObjc2SelectorRefs,        SEL,             "__objc_selrefs");
 GETSECT(_getObjc2MessageRefs,         message_ref_t,   "__objc_msgrefs"); 
 GETSECT(_getObjc2ClassRefs,           class_t *,       "__objc_classrefs");
 GETSECT(_getObjc2SuperRefs,           class_t *,       "__objc_superrefs");
-GETSECT(_getObjc2ClassList,           classref_t,       "__objc_classlist");
-GETSECT(_getObjc2NonlazyClassList,    classref_t,       "__objc_nlclslist");
+GETSECT(_getObjc2ClassList,           classref_t,      "__objc_classlist");
+GETSECT(_getObjc2NonlazyClassList,    classref_t,      "__objc_nlclslist");
 GETSECT(_getObjc2CategoryList,        category_t *,    "__objc_catlist");
 GETSECT(_getObjc2NonlazyCategoryList, category_t *,    "__objc_nlcatlist");
 GETSECT(_getObjc2ProtocolList,        protocol_t *,    "__objc_protolist");
@@ -150,7 +321,7 @@ getsegbynamefromheader(const headerType *head, const char *segname)
     sgp = (const segmentType *) (head + 1);
     for (i = 0; i < head->ncmds; i++){
         if (sgp->cmd == SEGMENT_CMD) {
-            if (strncmp(sgp->segname, segname, sizeof(sgp->segname)) == 0) {
+            if (strncmp(sgp->segname, segname, strlen(sgp->segname)) == 0) {
                 return sgp;
             }
         }
@@ -179,59 +350,5 @@ _hasObjcContents(const header_info *hi)
 
     return NO;
 }
-#elif TARGET_OS_ANDROID
-
-extern SEL *_getObjc2SelectorRefs(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-extern message_ref_t *_getObjc2MessageRefs(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-extern class_t **_getObjc2ClassRefs(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-extern class_t **_getObjc2SuperRefs(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-extern classref_t *_getObjc2ClassList(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-extern classref_t *_getObjc2NonlazyClassList(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-extern category_t **_getObjc2CategoryList(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-extern category_t **_getObjc2NonlazyCategoryList(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-extern protocol_t **_getObjc2ProtocolList(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-extern protocol_t **_getObjc2ProtocolRefs(const header_info *hi, size_t *count)
-{
-    return NULL; // FIXME!
-}
-
-
-#endif
 
 #endif

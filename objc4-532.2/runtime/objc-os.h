@@ -72,6 +72,7 @@
 #   include <System/pthread_machdep.h>
 #   include "objc-probes.h"  // generated dtrace probe definitions.
 
+typedef enum dyld_image_states image_state;
 
 #if defined(__i386__) || defined(__x86_64__)
 
@@ -238,6 +239,8 @@ static inline int ARRSpinLockTry(ARRSpinLock *l)
 #   include <libkern/OSAtomic.h>
 #   include <libkern/OSCacheControl.h>
 
+typedef int image_state;
+
 #   define OBJC_RUNTIME_OBJC_EXCEPTION_RETHROW() do {} while(0)  
 #   define OBJC_RUNTIME_OBJC_EXCEPTION_THROW(arg0) do {} while(0)
 
@@ -288,6 +291,63 @@ static inline int ARRSpinLockTry(ARRSpinLock *l)
 
 #include <elf.h>
 
+#ifndef MH_BUNDLE
+#define MH_BUNDLE 1
+#endif
+
+#ifndef MH_EXECUTE
+#define MH_EXECUTE 0
+#endif
+
+#ifndef SEGMENT_CMD
+#define SEGMENT_CMD 0
+#endif
+
+struct dyld_image_info {
+    uintptr_t imageLoadAddress;
+    const char *name;
+    struct dyld_image_info *next;
+};
+
+typedef struct segment_command {
+    int cmd;
+    int nsects;
+    size_t cmdsize;
+    const char *segname;
+    void *start_address;
+    size_t count;
+} segmentType;
+
+typedef struct section {
+    const char *sectname;
+} sectionType;
+
+/*
+__DATA, __objc_data
+__DATA, __objc_classrefs, regular, no_dead_strip
+__TEXT,__objc_methname,cstring_literals
+__DATA, __objc_msgrefs, coalesced
+__DATA, __objc_superrefs, regular, no_dead_strip
+__DATA, __objc_ivar
+__TEXT,__objc_classname,cstring_literals
+__TEXT,__objc_methtype,cstring_literals
+__DATA, __objc_const
+__DATA,__cfstring
+__DATA, __objc_classlist, regular, no_dead_strip
+__DATA, __objc_catlist, regular, no_dead_strip
+__TEXT,__cstring,cstring_literals
+__DATA, __objc_selrefs, literal_pointers, no_dead_strip
+__DATA,__datacoal_nt,coalesced
+__DATA, __objc_protolist, coalesced, no_dead_strip
+__DATA, __objc_protorefs, coalesced, no_dead_strip
+*/
+
+typedef struct {
+    int filetype;
+    int ncmds;
+    segmentType segments[10];
+} headerType;
+
 #define CRSetCrashLogMessage(msg) ""
 #define CRGetCrashLogMessage() ""
 #define CRSetCrashLogMessage2(msg) ""
@@ -296,8 +356,8 @@ static inline int ARRSpinLockTry(ARRSpinLock *l)
 __BEGIN_DECLS
 #   define getsectiondata(m, s, n, c) objc_getsectiondata(m, #s, n, c)
 #   define getsegmentdata(m, s, c) objc_getsegmentdata(m, #s, c)
-extern uint8_t *objc_getsectiondata(const Elf32_Ehdr *eh, const char *segname, const char *sectname, unsigned long *outSize);
-extern uint8_t * objc_getsegmentdata(const Elf32_Ehdr *eh, const char *segname, unsigned long *outSize);
+extern uint8_t *objc_getsectiondata(const headerType *eh, const char *segname, const char *sectname, unsigned long *outSize);
+extern uint8_t * objc_getsegmentdata(const headerType *eh, const char *segname, unsigned long *outSize);
 __END_DECLS
 
 #   if __cplusplus
@@ -1247,8 +1307,6 @@ static inline bool _rwlock_try_write_nodebug(rwlock_t *l)
     assert(err == 0  ||  err == EBUSY);
     return (err == 0);
 }
-
-#define headerType Elf32_Ehdr
 
 #else
 
