@@ -93,10 +93,40 @@ typedef struct _NSZone NSZone;
 @end
 
 OBJC_EXPORT
-@interface NSObject <NSObject>
-{
+@interface NSObject <NSObject> {
     Class isa;
 }
+
++ (void)load;
++ (void)initialize;
+- (id)init;
++ (id)new;
++ (id)allocWithZone:(NSZone *)zone;
++ (id)alloc;
+- (void)dealloc;
+- (void)finalize;
+- (id)copy;
+- (id)mutableCopy;
++ (id)copyWithZone:(NSZone *)zone;
++ (id)mutableCopyWithZone:(NSZone *)zone;
++ (Class)superclass;
++ (Class)class;
++ (BOOL)instancesRespondToSelector:(SEL)aSelector;
++ (BOOL)conformsToProtocol:(Protocol *)protocol;
+- (IMP)methodForSelector:(SEL)aSelector;
++ (IMP)instanceMethodForSelector:(SEL)aSelector;
+- (void)doesNotRecognizeSelector:(SEL)aSelector;
+- (id)forwardingTargetForSelector:(SEL)aSelector;
+- (void)forwardInvocation:(NSInvocation *)anInvocation;
+- (NSMethodSignature *)methodSignatureForSelector:(SEL)aSelector;
++ (NSMethodSignature *)instanceMethodSignatureForSelector:(SEL)aSelector;
+- (BOOL)allowsWeakReference;
+- (BOOL)retainWeakReference;
++ (NSString *)description;
++ (BOOL)isSubclassOfClass:(Class)aClass;
++ (BOOL)resolveClassMethod:(SEL)sel;
++ (BOOL)resolveInstanceMethod:(SEL)sel;
+
 @end
 
 // HACK -- the use of these functions must be after the @implementation
