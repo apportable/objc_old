@@ -53,7 +53,7 @@ sources = [
     'objc4-532.2/runtime/objc-sel.mm',
     'objc4-532.2/runtime/objc-sync.mm',
     'objc4-532.2/runtime/objc-typeencoding.mm',
-    'objc4-532.2/runtime/Object.m',
+    # 'objc4-532.2/runtime/Object.m',
     'objc4-532.2/runtime/Protocol.mm',
     'objc4-532.2/runtime/OldClasses.subproj/List.m',
     'objc4-532.2/runtime/Messengers.subproj/objc-msg-arm.S',
@@ -79,6 +79,7 @@ sources = [
     'objc4-532.2/runtime/NSObject.mm',
     'objc4-532.2/runtime/objc-opt.mm',
     'libclosure-59/runtime.c',
+    'libclosure-59/data.c',
     'libclosure-59/NSBlock.m',
 ]
 

@@ -49,13 +49,6 @@ typedef struct _NSZone NSZone;
 }
 @end
 
-extern void *_NSConcreteStackBlock[32] __attribute__((weak, alias ("OBJC_CLASS_$_NSConcreteStackBlock"), visibility("default")));
-extern void *_NSConcreteMallocBlock[32] __attribute__((weak, alias ("OBJC_CLASS_$_NSConcreteMallocBlock"), visibility("default")));
-extern void *_NSConcreteAutoBlock[32] __attribute__((weak, alias ("OBJC_CLASS_$_NSConcreteAutoBlock"), visibility("default")));
-extern void *_NSConcreteFinalizingBlock[32] __attribute__((weak, alias ("OBJC_CLASS_$_NSConcreteFinalizingBlock"), visibility("default")));
-extern void *_NSConcreteGlobalBlock[32] __attribute__((weak, alias ("OBJC_CLASS_$_NSConcreteGlobalBlock"), visibility("default")));
-extern void *_NSConcreteWeakBlockVariable[32] __attribute__((weak, alias ("OBJC_CLASS_$_NSConcreteWeakBlockVariable"), visibility("default")));
-
 @interface NSBlock : NSObject
 @end
 
@@ -108,7 +101,7 @@ extern void *_NSConcreteWeakBlockVariable[32] __attribute__((weak, alias ("OBJC_
 @implementation NSConcreteGlobalBlock
 @end
 
-@interface NSConcreteWeakBlockVariable : NSBlock
+@interface NSConcreteWeakBlockVariable : NSObject
 @end
 
 @implementation NSConcreteWeakBlockVariable
