@@ -2782,12 +2782,20 @@ Class _objc_allocateFutureClass(const char *name)
 /***********************************************************************
 * 
 **********************************************************************/
-void objc_setFutureClass(Class cls, const char *name)
+void objc_setFutureClass(Class c, const char *name)
 {
     rwlock_write(&runtimeLock);
-    
-    memset(cls, 0, sizeof(class_t));
-    addFutureNamedClass(name, (class_t *)cls);
+    class_t *cls;
+
+    NXMapTable *future_named_class_map = futureNamedClasses();
+
+    if ((cls = (class_t *)NXMapGet(future_named_class_map, name))) {
+        // Already have a future class for this name.
+        rwlock_unlock_write(&runtimeLock);
+        return;
+    }
+
+    addFutureNamedClass(name, (class_t *)c);
     
     rwlock_unlock_write(&runtimeLock);
 }
@@ -3276,7 +3284,17 @@ void prepare_load_methods(header_info *hi)
         _getObjc2NonlazyClassList(hi, &count);
     for (i = 0; i < count; i++) {
         schedule_class_load(remapClass(classlist[i]));
-    }
+    }  
+    
+
+    classlist = _getObjc2ClassList(hi, &count);
+    for (i = 0; i < count; i++) {
+        class_t *cls = remapClass(classlist[i]);
+        if (!cls) continue;
+        realizeClass(cls);
+        assert(isRealized(cls->isa));
+        schedule_class_load(cls);
+    }   
 
     category_t **categorylist = _getObjc2NonlazyCategoryList(hi, &count);
     for (i = 0; i < count; i++) {
