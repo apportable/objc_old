@@ -178,24 +178,18 @@ void __load_section(const char *section, uintptr_t start)
         lock_init();
         exception_init();
     }
+    
     if (section == NULL && start == 0) { // signifies that the section list is finished for this module
         map_images(0, 1, current_image_info);
-        load_images(0, 1, current_image_info);        
+        load_images(0, 1, current_image_info);
+        current_image_info->next = (struct dyld_image_info *)calloc(1, sizeof(struct dyld_image_info));
+        current_image_info = current_image_info->next;   
         return;
     }
-    Dl_info info;
-    int err = dladdr((const void *)start, &info);
-    const char *library = info.dli_fname;
 
     if (base_image_info == NULL) {
         base_image_info = (struct dyld_image_info *)calloc(1, sizeof(struct dyld_image_info));
-        base_image_info->name = strdup(library);
         current_image_info = base_image_info;
-    }
-    else if (strcmp(current_image_info->name, library) != 0) {
-        current_image_info->next = (struct dyld_image_info *)calloc(1, sizeof(struct dyld_image_info));
-        current_image_info = current_image_info->next;
-        current_image_info->name = strdup(library);
     }
     
     headerType *header = (headerType *)current_image_info->imageLoadAddress;

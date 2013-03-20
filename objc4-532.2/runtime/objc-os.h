@@ -305,7 +305,6 @@ static inline int ARRSpinLockTry(ARRSpinLock *l)
 
 struct dyld_image_info {
     uintptr_t imageLoadAddress;
-    const char *name;
     struct dyld_image_info *next;
 };
 
