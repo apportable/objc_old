@@ -80,7 +80,7 @@ sources = [
     'objc4-532.2/runtime/objc-opt.mm',
     'libclosure-59/runtime.c',
     'libclosure-59/data.c',
-    'libclosure-59/NSBlock.m',
+    'libclosure-59/NSBlock.mm',
 ]
 
 libs = [
