@@ -69,11 +69,11 @@ sources = [
     # 'objc4-532.2/runtime/a1a2-blocktramps-x86_64.s',
     # 'objc4-532.2/runtime/a2a3-blocktramps-i386.s',
     # 'objc4-532.2/runtime/a2a3-blocktramps-x86_64.s',
-    'objc4-532.2/runtime/objc-block-trampolines.mm',
+    # 'objc4-532.2/runtime/objc-block-trampolines.mm',
     # 'objc4-532.2/runtime/Messengers.subproj/objc-msg-simulator-i386.s',
     'objc4-532.2/runtime/objc-sel-table.S',
-    'objc4-532.2/runtime/a1a2-blocktramps-arm.S',
-    'objc4-532.2/runtime/a2a3-blocktramps-arm.S',
+    # 'objc4-532.2/runtime/a1a2-blocktramps-arm.S',
+    # 'objc4-532.2/runtime/a2a3-blocktramps-arm.S',
     'objc4-532.2/runtime/objc-externalref.mm',
     'objc4-532.2/runtime/objc-weak.mm',
     'objc4-532.2/runtime/NSObject.mm',
@@ -81,6 +81,8 @@ sources = [
     'libclosure-59/runtime.c',
     'libclosure-59/data.c',
     'libclosure-59/NSBlock.mm',
+    'objc/objc-block-trampolines.m',
+    'objc/block_trampolines.S',
 ]
 
 libs = [
