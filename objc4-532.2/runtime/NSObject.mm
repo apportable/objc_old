@@ -1601,13 +1601,13 @@ void arr_init(void)
 
 // Replaced by CF (throws an NSException)
 + (void)doesNotRecognizeSelector:(SEL)sel {
-    _objc_fatal("+[%s %s]: unrecognized selector sent to instance %p", 
+    DEBUG_LOG("+[%s %s]: unrecognized selector sent to instance %p", 
                 class_getName(self), sel_getName(sel), self);
 }
 
 // Replaced by CF (throws an NSException)
 - (void)doesNotRecognizeSelector:(SEL)sel {
-    _objc_fatal("-[%s %s]: unrecognized selector sent to instance %p", 
+    DEBUG_LOG("-[%s %s]: unrecognized selector sent to instance %p", 
                 object_getClassName(self), sel_getName(sel), self);
 }
 
