@@ -1059,18 +1059,6 @@ extern int secure_open(const char *filename, int flags, uid_t euid);
 #include <stdlib.h>
 #include <malloc.h>
 
-typedef void * malloc_zone_t;
-static __inline size_t malloc_good_size(size_t sz) { return sz; }
-static __inline malloc_zone_t *malloc_default_zone(void) { return (malloc_zone_t *)-1; }  // non-zero value so zero checks still work
-static __inline malloc_zone_t *_objc_internal_zone(void) { return (malloc_zone_t *)0; }
-static __inline void *malloc_zone_malloc(malloc_zone_t z, size_t size) { return malloc(size); }
-static __inline void *malloc_zone_calloc(malloc_zone_t z, size_t size, size_t count) { return calloc(size, count); }
-static __inline void *malloc_zone_realloc(malloc_zone_t z, void *p, size_t size) { return realloc(p, size); }
-static __inline void malloc_zone_free(malloc_zone_t z, void *p) { free(p); }
-static __inline void *malloc_zone_memalign(malloc_zone_t z, size_t alignment, size_t size) { return memalign(alignment, size); }
-static __inline malloc_zone_t malloc_zone_from_ptr(const void *p) { return (malloc_zone_t)0; }
-static __inline size_t malloc_size(const void *p) { return malloc_usable_size((void*)p); }
-
 //Assert.h missing
 
 // #define require_action_string(cond, dest, act, msg) do { if (!(cond)) { { act; } goto dest; } } while (0)

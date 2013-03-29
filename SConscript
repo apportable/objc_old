@@ -28,6 +28,7 @@ deps = [
     'malloc',
     'kern',
     'mach-o',
+    'malloc',
     'System',
 ]
 
@@ -89,6 +90,7 @@ libs = [
     'v',
     'cxx',
     'kern',
+    'malloc',
 ]
 
 Import('env')
