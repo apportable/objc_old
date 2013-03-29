@@ -1061,7 +1061,7 @@ extern int secure_open(const char *filename, int flags, uid_t euid);
 
 typedef void * malloc_zone_t;
 static __inline size_t malloc_good_size(size_t sz) { return sz; }
-static __inline malloc_zone_t *malloc_default_zone(void) { return (malloc_zone_t *)0; }
+static __inline malloc_zone_t *malloc_default_zone(void) { return (malloc_zone_t *)-1; }  // non-zero value so zero checks still work
 static __inline malloc_zone_t *_objc_internal_zone(void) { return (malloc_zone_t *)0; }
 static __inline void *malloc_zone_malloc(malloc_zone_t z, size_t size) { return malloc(size); }
 static __inline void *malloc_zone_calloc(malloc_zone_t z, size_t size, size_t count) { return calloc(size, count); }
