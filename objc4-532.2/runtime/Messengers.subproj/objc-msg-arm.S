@@ -301,6 +301,7 @@ _objc_exitPoints:
 	STATIC_ENTRY _cache_getMethod
 
 # search the cache
+	stmfd   sp!, {r9}
 	CacheLookup a2, a1, LGetMethodMiss
 
 # cache hit, method triplet in a1 and imp in ip
@@ -308,10 +309,12 @@ _objc_exitPoints:
 	it	eq
 	MOVEEQ  a1, #1          /* return (Method)1 if forward */
 	                        /* else return triplet (already in a1) */
+	ldmfd   sp!, {r9}
 	bx	lr
 	
 LGetMethodMiss:
 	MOVE    a1, #0          /* return nil if cache miss */
+	ldmfd   sp!, {r9}
 	bx	lr
 
 LGetMethodExit: 
@@ -333,14 +336,17 @@ LGetMethodExit:
 # save registers and load class for CacheLookup
 
 # search the cache
+	stmfd   sp!, {r9}
 	CacheLookup a2, a1, LGetImpMiss
 
 # cache hit, method triplet in a1 and imp in ip
 	MOVE    a1, ip          @ return imp
+	ldmfd   sp!, {r9}
 	bx	lr
 	
 LGetImpMiss:
 	MOVE    a1, #0          @ return nil if cache miss
+	ldmfd   sp!, {r9}
 	bx	lr
 
 LGetImpExit: 
@@ -362,19 +368,19 @@ LGetImpExit:
     beq     LMsgSendNilReceiver
 	
 # save registers and load receiver's class for CacheLookup
-	stmfd   sp!, {a4,v1}
+	stmfd   sp!, {a4,v1,r9}
 	ldr     v1, [a1, #ISA]
 
 # receiver is non-nil: search the cache
 	CacheLookup a2, v1, LMsgSendCacheMiss
 
 # cache hit (imp in ip) and CacheLookup returns with nonstret (eq) set, restore registers and call
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	bx      ip
 
 # cache miss: go search the method lists
 LMsgSendCacheMiss:
-	ldmfd	sp!, {a4,v1}
+	ldmfd	sp!, {a4,v1,r9}
 	b	objc_msgSend_uncached
 
 LMsgSendNilReceiver:
@@ -419,15 +425,16 @@ LMsgSendExit:
 	
 # load receiver's class for CacheLookup
 	ldr     a3, [a1, #ISA]
-
+	stmfd   sp!, {r9}
 # receiver is non-nil: search the cache
 	CacheLookup a2, a3, LMsgSendNoArgCacheMiss
-
 # cache hit (imp in ip) and CacheLookup returns with nonstret (eq) set
+	ldmfd   sp!, {r9}
 	bx      ip
 
 # cache miss: go search the method lists
 LMsgSendNoArgCacheMiss:
+	ldmfd   sp!, {r9}
 	b	objc_msgSend_uncached
 
 LMsgSendNoArgExit:
@@ -455,7 +462,7 @@ LMsgSendNoArgExit:
 	bxeq    lr
 
 # save registers and load receiver's class for CacheLookup
-	stmfd   sp!, {a4,v1}
+	stmfd   sp!, {a4,v1,r9}
 	ldr     v1, [a2, #ISA]
 
 # receiver is non-nil: search the cache
@@ -463,12 +470,12 @@ LMsgSendNoArgExit:
 
 # cache hit (imp in ip) - prep for forwarding, restore registers and call
 	tst	v1, v1		/* set stret (ne); v1 is nonzero (triplet) */
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	bx      ip
 
 # cache miss: go search the method lists
 LMsgSendStretCacheMiss:
-	ldmfd	sp!, {a4,v1}
+	ldmfd	sp!, {a4,v1,r9}
 	b	objc_msgSend_stret_uncached
 	
 LMsgSendStretExit:
@@ -511,20 +518,20 @@ LMsgSendStretExit:
 	ENTRY objc_msgSendSuper
 
 # save registers and load super class for CacheLookup
-	stmfd   sp!, {a4,v1}
+	stmfd   sp!, {a4,v1,r9}
 	ldr     v1, [a1, #CLASS]
 
 # search the cache
 	CacheLookup a2, v1, LMsgSendSuperCacheMiss
 
 # cache hit (imp in ip) and CacheLookup returns with nonstret (eq) set, restore registers and call
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	ldr     a1, [a1, #RECEIVER]    @ fetch real receiver
 	bx      ip
 
 # cache miss: go search the method lists
 LMsgSendSuperCacheMiss:
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	b	objc_msgSendSuper_uncached
 
 LMsgSendSuperExit:
@@ -560,7 +567,7 @@ LMsgSendSuperExit:
 	ENTRY objc_msgSendSuper2
 
 # save registers and load super class for CacheLookup
-	stmfd   sp!, {a4,v1}
+	stmfd   sp!, {a4,v1,r9}
 	ldr     v1, [a1, #CLASS]
 	ldr     v1, [v1, #SUPERCLASS]
 
@@ -568,13 +575,13 @@ LMsgSendSuperExit:
 	CacheLookup a2, v1, LMsgSendSuper2CacheMiss
 
 # cache hit (imp in ip) and CacheLookup returns with nonstret (eq) set, restore registers and call
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	ldr     a1, [a1, #RECEIVER]    @ fetch real receiver
 	bx      ip
 
 # cache miss: go search the method lists
 LMsgSendSuper2CacheMiss:
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	b	objc_msgSendSuper2_uncached
 
 LMsgSendSuper2Exit:
@@ -627,7 +634,7 @@ LMsgSendSuper2Exit:
 	ENTRY objc_msgSendSuper_stret
 
 # save registers and load super class for CacheLookup
-	stmfd   sp!, {a4,v1}
+	stmfd   sp!, {a4,v1,r9}
 	ldr     v1, [a2, #CLASS]
 
 # search the cache
@@ -635,13 +642,13 @@ LMsgSendSuper2Exit:
 
 # cache hit (imp in ip) - prep for forwarding, restore registers and call
 	tst     v1, v1		/* set stret (ne); v1 is nonzero (triplet) */
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	ldr     a2, [a2, #RECEIVER]      @ fetch real receiver
 	bx    	ip
 
 # cache miss: go search the method lists
 LMsgSendSuperStretCacheMiss:
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	b	objc_msgSendSuper_stret_uncached
 
 LMsgSendSuperStretExit:
@@ -679,7 +686,7 @@ LMsgSendSuperStretExit:
 	ENTRY objc_msgSendSuper2_stret
 
 # save registers and load super class for CacheLookup
-	stmfd   sp!, {a4,v1}
+	stmfd   sp!, {a4,v1,r9}
 	ldr     v1, [a2, #CLASS]
 	ldr     v1, [v1, #SUPERCLASS]
 
@@ -688,13 +695,13 @@ LMsgSendSuperStretExit:
 
 # cache hit (imp in ip) - prep for forwarding, restore registers and call
 	tst     v1, v1		/* set stret (ne); v1 is nonzero (triplet) */
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	ldr     a2, [a2, #RECEIVER]      @ fetch real receiver
 	bx    	ip
 
 # cache miss: go search the method lists
 LMsgSendSuper2StretCacheMiss:
-	ldmfd   sp!, {a4,v1}
+	ldmfd   sp!, {a4,v1,r9}
 	b	objc_msgSendSuper2_stret_uncached
 
 LMsgSendSuper2StretExit:
