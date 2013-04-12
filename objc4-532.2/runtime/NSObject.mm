@@ -45,6 +45,7 @@
 #include <Block.h>
 #include <map>
 #include <execinfo.h>
+#include "block_private.h"
 
 @interface NSInvocation
 - (SEL)selector;
@@ -1438,6 +1439,13 @@ void arr_init(void)
 
 + (void)load {
     if (UseGC) gc_init2();
+    Block_callbacks_RR callbacks = {
+        sizeof(struct Block_callbacks_RR),
+        (void (*)(const void *))&objc_retain,
+        (void (*)(const void *))&objc_release,
+        (void (*)(const void *))&objc_destructInstance
+    };
+    _Block_use_RR2(&callbacks);
 }
 
 + (void)initialize {
