@@ -45,7 +45,7 @@
 #include <Block.h>
 #include <map>
 #include <execinfo.h>
-#include "block_private.h"
+#include "Block_private.h"
 
 @interface NSInvocation
 - (SEL)selector;
