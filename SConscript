@@ -24,11 +24,6 @@ header_paths = [
 deps = [
     'v',
     'cxx',
-    'mach',
-    'malloc',
-    'kern',
-    'mach-o',
-    'malloc',
     'System',
 ]
 
@@ -89,8 +84,7 @@ sources = [
 libs = [
     'v',
     'cxx',
-    'kern',
-    'malloc',
+    'System',
 ]
 
 Import('env')
