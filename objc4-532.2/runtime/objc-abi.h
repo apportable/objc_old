@@ -175,11 +175,9 @@ OBJC_EXPORT struct objc_typeinfo OBJC_EHTYPE_id
 struct _Unwind_Exception;
 struct _Unwind_Context;
 OBJC_EXPORT int
-__objc_personality_v0(int version,
-                      int actions,
-                      uint64_t exceptionClass,
-                      struct _Unwind_Exception *exceptionObject,
-                      struct _Unwind_Context *context)
+__objc_personality_v0(int state, 
+                     struct _Unwind_Exception *unwind_exception, 
+                     struct _Unwind_Context *context)
     __OSX_AVAILABLE_STARTING(__MAC_10_5, __IPHONE_2_0);
 
 #endif

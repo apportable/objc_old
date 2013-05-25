@@ -295,9 +295,7 @@ OBJC_EXTERN void *__cxa_current_exception_type(void);
 
 OBJC_EXTERN _Unwind_Reason_Code 
 CXX_PERSONALITY(int version,
-                _Unwind_Action actions,
-                uint64_t exceptionClass,
-                struct _Unwind_Exception *exceptionObject,
+                struct _Unwind_Exception *unwind_exception, 
                 struct _Unwind_Context *context);
 
 
@@ -442,31 +440,12 @@ objc_setUncaughtExceptionHandler(objc_uncaught_exception_handler fn)
 static void call_alt_handlers(struct _Unwind_Context *ctx);
 
 _Unwind_Reason_Code 
-__objc_personality_v0(int version,
-                      _Unwind_Action actions,
-                      uint64_t exceptionClass,
-                      struct _Unwind_Exception *exceptionObject,
-                      struct _Unwind_Context *context)
+__objc_personality_v0(int state, 
+                     struct _Unwind_Exception *unwind_exception, 
+                     struct _Unwind_Context *context)
 {
-    BOOL unwinding = ((actions & _UA_CLEANUP_PHASE)  ||  
-                      (actions & _UA_FORCE_UNWIND));
-
-    if (PrintExceptions) {
-        _objc_inform("EXCEPTIONS: %s through frame [ip=%p sp=%p] "
-                     "for exception %p", 
-                     unwinding ? "unwinding" : "searching", 
-                     (void*)(_Unwind_GetIP(context)-1),
-                     (void*)_Unwind_GetCFA(context), exceptionObject);
-    }
-
-    // If we're executing the unwind, call this frame's alt handlers, if any.
-    if (unwinding) {
-        call_alt_handlers(context);
-    }
-
     // Let C++ handle the unwind itself.
-    return CXX_PERSONALITY(version, actions, exceptionClass, 
-                           exceptionObject, context);
+    return CXX_PERSONALITY(state, unwind_exception, context);
 }
 
 
