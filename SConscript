@@ -88,4 +88,4 @@ libs = [
 ]
 
 Import('env')
-env.BuildLibrary(sources = sources, header_paths = header_paths, static=False, defines = defines, flags = flags, deps = deps, libs=libs)
+env.BuildLibrary('objc', sources = sources, header_paths = header_paths, static=False, defines = defines, flags = flags, deps = deps, libs=libs)
