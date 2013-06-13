@@ -161,6 +161,10 @@
 #include "objc-auto.h"
 #include <objc/message.h>
 
+#ifdef TARGET_OS_ANDROID
+#import <libv/libv.h>
+#endif
+
 
 /* overriding the default object allocation and error handling routines */
 
@@ -1238,7 +1242,6 @@ _objc_constructOrFree(Class cls, void *bytes)
     return obj;
 }
 
-
 /***********************************************************************
 * _class_createInstancesFromZone
 * Batch-allocating version of _class_createInstanceFromZone.
@@ -1265,10 +1268,13 @@ _class_createInstancesFromZone(Class cls, size_t extraBytes, void *zone,
     } else 
 #endif
     {
+        const char *class_name = class_getName(cls);
+        
         unsigned i;
         for (i = 0; i < num_requested; i++)
         {
-            results[i] = (id)calloc(1, size);
+            results[i] = (id)je_malloc_tagged(size, MALLOC_TYPE_OBJCOBJ, (void *)class_name, __builtin_return_address(2), 1);
+
             if (results[i] != NULL)
             {
                 num_allocated = i;

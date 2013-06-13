@@ -6759,6 +6759,11 @@ object_dispose(id obj)
     }
 #endif
 
+#ifndef NDEBUG 
+    //memset_pattern4(obj, 0xdeadface, malloc_usable_size(obj));
+    obj->isa = 0xdeadbeef;
+#endif
+
     free(obj);
 
     return nil;

@@ -12,6 +12,10 @@
 #include "gc_ops.h"
 #include "lock.h"
 
+#ifdef TARGET_OS_ANDROID
+#import <libv/libv.h>
+#endif
+
 extern const char *_objc_copyPropertyAttributeString(const objc_property_attribute_t *attrs, unsigned int count);
 extern objc_property_attribute_t *_objc_copyPropertyAttributeList(const char *attrs, unsigned int *outCount);
 extern char *_objc_copyPropertyAttributeValue(const char *attrs, const char *name);
@@ -167,7 +171,10 @@ objc_property_t* class_copyPropertyList(Class cls, unsigned int *outCount)
 		}
 		return NULL;
 	}
-	objc_property_t *list = calloc(count,sizeof(objc_property_t));
+
+	//objc_property_t *list = calloc(count,sizeof(objc_property_t));
+	objc_property_t *list = je_malloc_tagged(count*sizeof(objc_property_t), 3, class_getName(cls), &class_copyPropertyList, 1);
+
 	unsigned int out = 0;
 	for (struct objc_property_list *l=properties ; NULL!=l ; l=l->next)
 	{
